@@ -7,21 +7,29 @@ runs:
   using: composite
   steps:
     - uses: ./.github/actions/setup-dictum
-    - uses: oprypin/find-latest-tag@v1
-      id: find_tag
-      with:
-        repository: discover-labs/dictum-backend-${{ inputs.backend }}
     - uses: actions/checkout@v3
       with:
         repository: discover-labs/dictum-backend-${{ inputs.backend }}
-        ref: ${{ steps.find_tag.outputs.tag }}
         path: ${{ inputs.backend }}
+
+    - name: Find latest compatible version
+      id: version
+      run: echo "::set-output name=tag::$(git --git-dir ${{ inputs.backend }} tag | poetry run python -m dictum_core.utils.version)"
+      shell: bash
+
+    - name: Checkout to tag
+      run: git checkout ${{ steps.version.outputs.tag }}
+      working-directory: ${{ inputs.backend }}
+      shell: bash
+
     - run: poetry build
       working-directory: ${{ inputs.backend }}
       shell: bash
+
     - run: poetry run pip install ../${{ inputs.backend }}/dist/*.whl
       working-directory: dictum-core
       shell: bash
+
     - run: poetry run pytest ../${{ inputs.backend }}/tests/
       working-directory: dictum-core
       shell: bash
