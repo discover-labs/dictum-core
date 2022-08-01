@@ -8,19 +8,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  # test:
-  #   name: Run dictum-core tests
-  #   runs-on: ubuntu-latest
-  #   defaults:
-  #     run:
-  #       working-directory: dictum-core
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - uses: ./.github/actions/setup-dictum
-  #     - run: poetry run pytest
-  #     - uses: codecov/codecov-action@v3
-  #       with:
-  #         files: dictum/coverage.xml
+  test:
+    name: Run dictum-core tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dictum-core
+    steps:
+      - uses: actions/checkout@v3
+      - uses: ./.github/actions/setup-dictum
+      - run: poetry run pytest
+      - uses: codecov/codecov-action@v3
+        with:
+          files: dictum-core/coverage.xml
   test-backend-postgres:
     name: Run tests for Postgres backend
     runs-on: ubuntu-latest
