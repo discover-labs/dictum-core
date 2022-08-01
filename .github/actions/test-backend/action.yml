@@ -20,8 +20,8 @@ runs:
       working-directory: ${{ inputs.backend }}
       shell: bash
     - run: poetry run pip install ../${{ inputs.backend }}/dist/*.whl
-      working-directory: dictum
+      working-directory: dictum-core
       shell: bash
     - run: poetry run pytest ../${{ inputs.backend }}/tests/
-      working-directory: dictum
+      working-directory: dictum-core
       shell: bash
