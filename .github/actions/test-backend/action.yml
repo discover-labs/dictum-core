@@ -12,6 +12,9 @@ runs:
         repository: discover-labs/dictum-backend-${{ inputs.backend }}
         path: ${{ inputs.backend }}
 
+    - run: ls -l
+      shell: bash
+
     - name: Find latest compatible version
       id: version
       run: echo "::set-output name=tag::$(git --git-dir ../${{ inputs.backend }} tag | poetry run python -m dictum_core.utils.version)"
