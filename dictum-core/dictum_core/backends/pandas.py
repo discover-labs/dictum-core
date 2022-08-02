@@ -56,31 +56,31 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
     # built-in functions
     # aggregate
 
-    def sum(self, args: list):
-        return args[0].sum()
+    def sum(self, arg):
+        return arg.sum()
 
-    def avg(self, args: list):
-        return args[0].mean()
+    def avg(self, arg):
+        return arg.mean()
 
-    def min(self, args: list):
-        return args[0].min()
+    def min(self, arg):
+        return arg.min()
 
-    def max(self, args: list):
-        return args[0].max()
+    def max(self, arg):
+        return arg.max()
 
     def count(self, args: list):
         """Aggregate count, with optional argument"""
+        raise NotImplementedError  # not needed for now
 
-    def countd(self, args: list):
-        return args[0].unique().shape[0]
+    def countd(self, arg):
+        return arg.unique().shape[0]
 
     # window functions
 
-    def window_sum(self, args, partition, order, rows):
-        val = args[0]
+    def window_sum(self, arg, partition, order, rows):
         if partition:
-            return val.groupby(partition).transform(sum)
-        return val.groupby(pd.Series(0, index=val.index)).transform(sum)
+            return arg.groupby(partition).transform(sum)
+        return arg.groupby(pd.Series(0, index=arg.index)).transform(sum)
 
     def window_row_number(self, args, partition, order, rows):
         if order is None and partition is None:
@@ -96,16 +96,16 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
 
     # scalar functions
 
-    def abs(self, args: list):
-        return args[0].abs()
+    def abs(self, arg):
+        return arg.abs()
 
-    def floor(self, args: list):
-        return args[0].floor()
+    def floor(self, arg):
+        return arg.floor()
 
-    def ceil(self, args: list):
-        return args[0].ceil()
+    def ceil(self, arg):
+        return arg.ceil()
 
-    def coalesce(self, args: list):
+    def coalesce(self, *args):
         result, *rest = args
         for item in rest:
             result = result.fillna(item)
@@ -113,44 +113,44 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
 
     # type casting
 
-    def tointeger(self, args: list):
-        return args[0].astype(int)
+    def tointeger(self, arg):
+        return arg.astype(int)
 
-    def tofloat(self, args: list):
-        return args[0].astype(float)
+    def tofloat(self, arg):
+        return arg.astype(float)
 
-    def todate(self, args: list):
-        return pd.to_datetime(args[0]).dt.round("D")
+    def todate(self, arg):
+        return pd.to_datetime(arg).dt.round("D")
 
-    def todatetime(self, args: list):
-        return pd.to_datetime(args[0])
+    def todatetime(self, arg):
+        return pd.to_datetime(arg)
 
     # dates
 
-    def datepart(self, args: list):
+    def datepart(self, part, arg):
         """Part of a date as an integer. First arg is part as a string, e.g. 'month',
         second is date/datetime.
         """
-        return getattr(args[1].dt, args[0])
+        return getattr(arg.dt, part)
 
-    def datetrunc(self, args: list):
+    def datetrunc(self, part, arg):
         """Date truncated to a given part. Args same as datepart."""
+        # TODO: support other parts
         mapping = {
             "year": "YS",
             "month": "MS",
             "day": "D",
         }
-        return args[1].dt.round(mapping[args[0]])
+        return arg.dt.round(mapping[part])
 
     # for DatediffCompilerMixin
-    def datediff_day(self, args: list):
-        start, end = args
+    def datediff_day(self, start, end):
         return (end - start).days
 
-    def now(self, _):
+    def now(self):
         return datetime.now()
 
-    def today(self, _):
+    def today(self):
         return datetime.today()
 
     # compilation

@@ -36,37 +36,34 @@ part_formats = {
 
 
 class SQLiteFunctionsMixin:
-    def floor(self, args):
-        arg = args[0]
+    def floor(self, arg):
         return case(
             (arg < 0, cast(arg, Integer) - 1),
             else_=cast(arg, Integer),
         )
 
-    def ceil(self, args):
-        arg = args[0]
+    def ceil(self, arg):
         return case(
             (arg > 0, cast(arg, Integer) + 1),
             else_=cast(arg, Integer),
         )
 
-    def todate(self, args: list):
-        return func.date(args[0])
+    def todate(self, arg):
+        return func.date(arg)
 
-    def todatetime(self, args: list):
-        return func.datetime(args[0])
+    def todatetime(self, arg):
+        return func.datetime(arg)
 
-    def datetrunc(self, args: list):
-        part, value = args
+    def datetrunc(self, part, arg):
         if part in trunc_modifiers:
             modifiers = trunc_modifiers[part]
-            return func.datetime(value, *modifiers)
+            return func.datetime(arg, *modifiers)
         if part in trunc_formats:
             fmt = trunc_formats[part]
-            return func.strftime(fmt, value)
+            return func.strftime(fmt, arg)
         if part == "quarter":
-            year = self.datetrunc(["year", value])
-            quarter_part = self.datepart_quarter([value])
+            year = self.datetrunc("year", arg)
+            quarter_part = self.datepart_quarter(arg)
             return func.datetime(
                 year, "start of year", cast((quarter_part - 1) * 3, String) + " months"
             )
@@ -76,39 +73,34 @@ class SQLiteFunctionsMixin:
             f"got '{part}'."
         )
 
-    def datepart_quarter(self, args: list):
+    def datepart_quarter(self, arg):
         return cast(
-            (func.strftime("%m", args[0]) + 2) / 3,
+            (func.strftime("%m", arg) + 2) / 3,
             Integer,
         )
 
-    def datepart(self, args: list):
-        part, value = args
+    def datepart(self, part, arg):
         part = part.lower()
         fmt = part_formats.get(part)
         if fmt is not None:
-            return cast(func.strftime(fmt, value), Integer)
+            return cast(func.strftime(fmt, arg), Integer)
         if part == "quarter":
-            return self.datepart_quarter([value])
+            return self.datepart_quarter(arg)
         raise ValueError(
             "Valid values for datepart part are year, quarter, "
             "month, week, day, hour, minute, second — "
             f"got '{part}'."
         )
 
-    def datediff_week(self, args: list):
-        return cast(super().datediff_week(args), Integer)
-
-    def datediff_day(self, args: list):
-        start, end = args
-        start_day = func.julianday(self.datetrunc(["day", start]))
-        end_day = func.julianday(self.datetrunc(["day", end]))
+    def datediff_day(self, start, end):
+        start_day = func.julianday(self.datetrunc("day", start))
+        end_day = func.julianday(self.datetrunc("day", end))
         return cast(end_day - start_day, Integer)
 
-    def now(self, _):
+    def now(self):
         return func.datetime()
 
-    def today(self, _):
+    def today(self):
         return func.date()
 
 
