@@ -403,18 +403,25 @@ class Compiler(ABC):
 class BackendRegistry(UserDict):
     def __init__(self, dict=None, /, **kwargs):
         super().__init__(dict, **kwargs)
-        self.discovered = False
+
+    @cached_property
+    def registry(self):
+        Backend.discover_plugins()
+        return self.data
 
     def __getitem__(self, key: str) -> "Backend":
-        if not self.discovered:
-            Backend.discover_plugins()
-            self.discovered = True
-        if key not in self.data:
+        if key not in self.registry:
             raise ImportError(
                 f"Backend {type} was not found. Try installing dictum[{type}] "
                 "package."
             )
         return self.data[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.registry
+
+    def __str__(self) -> str:
+        return str(self.registry)
 
 
 class Backend(ABC):
@@ -449,10 +456,10 @@ class Backend(ABC):
             result[name] = par.default if par.default != inspect._empty else None
         return result
 
-    @staticmethod
-    def discover_plugins():
+    @classmethod
+    def discover_plugins(cls):
         for entry_point in pkg_resources.iter_entry_points("dictum.backends"):
-            entry_point.load()
+            cls.registry[entry_point.name] = entry_point.load()
 
     def display_query(self, query):
         return str(query)
