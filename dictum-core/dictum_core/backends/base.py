@@ -1,8 +1,8 @@
 import inspect
+from collections import UserDict
 from functools import cached_property
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 import pkg_resources
@@ -10,23 +10,6 @@ from lark import Token, Transformer
 from pandas import DataFrame
 
 from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
-
-
-class Timer:
-    def __init__(self):
-        self.start = None
-        self.end = None
-
-    def __enter__(self):
-        self.start = perf_counter()
-        return self
-
-    def __exit__(self, *_):
-        self.end = perf_counter()
-
-    @property
-    def duration(self):
-        return int((self.end - self.start) * 1000)
 
 
 @dataclass
@@ -417,6 +400,23 @@ class Compiler(ABC):
         """Add ordering to a query."""
 
 
+class BackendRegistry(UserDict):
+    def __init__(self, dict=None, /, **kwargs):
+        super().__init__(dict, **kwargs)
+        self.discovered = False
+
+    def __getitem__(self, key: str) -> "Backend":
+        if not self.discovered:
+            Backend.discover_plugins()
+            self.discovered = True
+        if key not in self.data:
+            raise ImportError(
+                f"Backend {type} was not found. Try installing dictum[{type}] "
+                "package."
+            )
+        return self.data[key]
+
+
 class Backend(ABC):
     """User-facing. Gets connection details, knows about it's compiler. Compiles
     the incoming computation, executes on the client.
@@ -425,28 +425,19 @@ class Backend(ABC):
     type: str
     compiler_cls = Compiler
 
-    _registry: Dict[str, "Backend"] = {}
+    registry: BackendRegistry = BackendRegistry()
 
     def __init__(self):
         self.compiler = self.compiler_cls(self)
 
     def __init_subclass__(cls):
         if hasattr(cls, "type"):
-            cls._registry[cls.type] = cls
-
-    @cached_property
-    def registry(self) -> Dict[str, "Backend"]:
-        self.discover_plugins()
-        return self._registry
+            cls.registry[cls.type] = cls
 
     @classmethod
     def create(cls, type: str, parameters: Optional[dict] = None):
-        if type not in cls.registry:
-            raise ImportError(
-                f"Backend {type} was not found. Try installing dictum[{type}] "
-                "package."
-            )
-
+        if parameters is None:
+            parameters = {}
         return cls.registry[type](**parameters)
 
     @classmethod
