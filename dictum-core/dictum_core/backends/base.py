@@ -1,7 +1,8 @@
 import inspect
+from collections import UserDict
+from functools import cached_property
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 import pkg_resources
@@ -9,23 +10,6 @@ from lark import Token, Transformer
 from pandas import DataFrame
 
 from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
-
-
-class Timer:
-    def __init__(self):
-        self.start = None
-        self.end = None
-
-    def __enter__(self):
-        self.start = perf_counter()
-        return self
-
-    def __exit__(self, *_):
-        self.end = perf_counter()
-
-    @property
-    def duration(self):
-        return int((self.end - self.start) * 1000)
 
 
 @dataclass
@@ -416,6 +400,30 @@ class Compiler(ABC):
         """Add ordering to a query."""
 
 
+class BackendRegistry(UserDict):
+    def __init__(self, dict=None, /, **kwargs):
+        super().__init__(dict, **kwargs)
+
+    @cached_property
+    def registry(self):
+        Backend.discover_plugins()
+        return self.data
+
+    def __getitem__(self, key: str) -> "Backend":
+        if key not in self.registry:
+            raise ImportError(
+                f"Backend {type} was not found. Try installing dictum[{type}] "
+                "package."
+            )
+        return self.data[key]
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.registry
+
+    def __str__(self) -> str:
+        return str(self.registry)
+
+
 class Backend(ABC):
     """User-facing. Gets connection details, knows about it's compiler. Compiles
     the incoming computation, executes on the client.
@@ -424,7 +432,7 @@ class Backend(ABC):
     type: str
     compiler_cls = Compiler
 
-    registry: Dict[str, "Backend"] = {}
+    registry: BackendRegistry = BackendRegistry()
 
     def __init__(self):
         self.compiler = self.compiler_cls(self)
@@ -435,12 +443,8 @@ class Backend(ABC):
 
     @classmethod
     def create(cls, type: str, parameters: Optional[dict] = None):
-        if type not in cls.registry:
-            raise ImportError(
-                f"Backend {type} was not found. Try installing dictum-backend-{type} "
-                "package."
-            )
-
+        if parameters is None:
+            parameters = {}
         return cls.registry[type](**parameters)
 
     @classmethod
@@ -452,10 +456,10 @@ class Backend(ABC):
             result[name] = par.default if par.default != inspect._empty else None
         return result
 
-    @staticmethod
-    def discover_plugins():
+    @classmethod
+    def discover_plugins(cls):
         for entry_point in pkg_resources.iter_entry_points("dictum.backends"):
-            entry_point.load()
+            cls.registry[entry_point.name] = entry_point.load()
 
     def display_query(self, query):
         return str(query)
@@ -487,6 +491,3 @@ class Backend(ABC):
     @abstractmethod
     def execute(self, query) -> DataFrame:
         """Execute query, return results"""
-
-
-Backend.discover_plugins()
