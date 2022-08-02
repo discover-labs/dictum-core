@@ -12,10 +12,11 @@ jobs:
       run:
         working-directory: dictum-core
     env:
-      POETRY_PYPI_TOKEN: ${{ secrets.POETRY_PYPI_TOKEN }}
+      POETRY_PYPI_TOKEN_PYPI: ${{ secrets.POETRY_PYPI_TOKEN }}
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/setup-dictum
         with:
           python-version: 3.9
+      - run: - poetry config http-basic.pypi "__token__" "${POETRY_PYPI_TOKEN_PYPI}"
       - run: poetry publish --build
