@@ -1,4 +1,5 @@
 import inspect
+from functools import cached_property
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from time import perf_counter
@@ -424,20 +425,25 @@ class Backend(ABC):
     type: str
     compiler_cls = Compiler
 
-    registry: Dict[str, "Backend"] = {}
+    _registry: Dict[str, "Backend"] = {}
 
     def __init__(self):
         self.compiler = self.compiler_cls(self)
 
     def __init_subclass__(cls):
         if hasattr(cls, "type"):
-            cls.registry[cls.type] = cls
+            cls._registry[cls.type] = cls
+
+    @cached_property
+    def registry(self) -> Dict[str, "Backend"]:
+        self.discover_plugins()
+        return self._registry
 
     @classmethod
     def create(cls, type: str, parameters: Optional[dict] = None):
         if type not in cls.registry:
             raise ImportError(
-                f"Backend {type} was not found. Try installing dictum-backend-{type} "
+                f"Backend {type} was not found. Try installing dictum[{type}] "
                 "package."
             )
 
@@ -487,6 +493,3 @@ class Backend(ABC):
     @abstractmethod
     def execute(self, query) -> DataFrame:
         """Execute query, return results"""
-
-
-Backend.discover_plugins()
