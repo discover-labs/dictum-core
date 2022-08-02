@@ -18,5 +18,4 @@ jobs:
       - uses: ./.github/actions/setup-dictum
         with:
           python-version: 3.9
-      - run: - poetry config http-basic.pypi "__token__" "${POETRY_PYPI_TOKEN_PYPI}"
       - run: poetry publish --build
