@@ -15,7 +15,7 @@ jobs:
       POETRY_PYPI_TOKEN: ${{ secrets.POETRY_PYPI_TOKEN }}
     steps:
       - uses: actions/checkout@v3
-      - uses: ./.github/workflows/setup-dictum
+      - uses: ./.github/actions/setup-dictum
         with:
           python-version: 3.9
       - run: poetry publish --build
