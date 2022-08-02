@@ -8,55 +8,45 @@ class DatediffCompilerMixin(ABC):
     The child class only needs to implement datediff_day
     """
 
-    def datediff_year(self, args: list):
-        start, end = args
-        return self.datepart(["year", end]) - self.datepart(["year", start])
+    def datediff_year(self, start, end):
+        return self.datepart("year", end) - self.datepart("year", start)
 
-    def datediff_quarter(self, args: list):
-        start, end = args
-        return self.datediff_year(args) * 4 + (
-            self.datepart(["quarter", end]) - self.datepart(["quarter", start])
+    def datediff_quarter(self, start, end):
+        return self.datediff_year(start, end) * 4 + (
+            self.datepart("quarter", end) - self.datepart("quarter", start)
         )
 
-    def datediff_month(self, args: list):
-        start, end = args
-        return self.datediff_year(args) * 12 + (
-            self.datepart(["month", end]) - self.datepart(["month", start])
+    def datediff_month(self, start, end):
+        return self.datediff_year(start, end) * 12 + (
+            self.datepart("month", end) - self.datepart("month", start)
         )
 
-    def datediff_week(self, args: list):
-        start, end = args
-        start_week = self.datetrunc(["week", start])
-        end_week = self.datetrunc(["week", end])
-        return self.datediff_day([start_week, end_week]) / 7
+    def datediff_week(self, start, end):
+        start_week = self.datetrunc("week", start)
+        end_week = self.datetrunc("week", end)
+        return self.tointeger(self.datediff_day(start_week, end_week) / 7)
 
     @abstractmethod
-    def datediff_day(self, args: list):
+    def datediff_day(self, start, end):
         """This can't be implemented through other functions"""
 
-    def datediff_hour(self, args: list):
-        start, end = args
-        days = self.datediff_day([start, end])
-        return days * 24 + (
-            self.datepart(["hour", end]) - self.datepart(["hour", start])
-        )
+    def datediff_hour(self, start, end):
+        days = self.datediff_day(start, end)
+        return days * 24 + (self.datepart("hour", end) - self.datepart("hour", start))
 
-    def datediff_minute(self, args: list):
-        start, end = args
-        hours = self.datediff_hour([start, end])
+    def datediff_minute(self, start, end):
+        hours = self.datediff_hour(start, end)
         return hours * 60 + (
-            self.datepart(["minute", end]) - self.datepart(["minute", start])
+            self.datepart("minute", end) - self.datepart("minute", start)
         )
 
-    def datediff_second(self, args: list):
-        start, end = args
-        minutes = self.datediff_minute([start, end])
+    def datediff_second(self, start, end):
+        minutes = self.datediff_minute(start, end)
         return minutes * 60 + (
-            self.datepart(["second", end]) - self.datepart(["second", start])
+            self.datepart("second", end) - self.datepart("second", start)
         )
 
-    def datediff(self, args: list):
-        part, *args = args
+    def datediff(self, part, start, end):
         fn = {
             "year": self.datediff_year,
             "quarter": self.datediff_quarter,
@@ -73,4 +63,4 @@ class DatediffCompilerMixin(ABC):
                 "month, week, day, hour, minute, second — "
                 f"got '{part}'."
             )
-        return fn(args)
+        return fn(start, end)

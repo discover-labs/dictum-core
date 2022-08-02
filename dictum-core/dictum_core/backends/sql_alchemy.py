@@ -89,23 +89,26 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
     def case(self, whens, else_=None):
         return case(whens, else_=else_)
 
-    def sum(self, args):
-        return func.sum(*args)
+    def sum(self, arg):
+        return func.sum(arg)
 
-    def avg(self, args):
-        return func.avg(*args)
+    def avg(self, arg):
+        return func.avg(arg)
 
-    def min(self, args):
-        return func.min(*args)
+    def min(self, arg):
+        return func.min(arg)
 
-    def max(self, args):
-        return func.max(*args)
+    def max(self, arg):
+        return func.max(arg)
 
-    def count(self, args):
+    def count(self, arg=None):
+        args = []
+        if arg is not None:
+            args = [arg]
         return func.count(*args)
 
-    def countd(self, args):
-        return func.count(distinct(*args))
+    def countd(self, arg):
+        return func.count(distinct(arg))
 
     def call_window(
         self, fn: str, args: list, partition: list, order: list, rows: list
@@ -117,52 +120,52 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
                 col = col.asc() if asc else col.desc()
                 order_by.append(col)
             order = order_by
-        return super().call_window(fn, args, partition, order, rows)
+        return super().call_window(fn, *args, partition, order, rows)
 
-    def window_sum(self, args, partition, order, rows):
-        return func.sum(*args).over(partition_by=partition, order_by=order)
+    def window_sum(self, arg, partition, order, rows):
+        return func.sum(arg).over(partition_by=partition, order_by=order)
 
     def window_row_number(self, _, partition, order, rows):
         return func.row_number().over(partition_by=partition, order_by=order)
 
-    def floor(self, args):
-        return func.floor(*args)
+    def floor(self, arg):
+        return func.floor(arg)
 
-    def ceil(self, args):
-        return func.ceil(*args)
+    def ceil(self, arg):
+        return func.ceil(arg)
 
-    def abs(self, args):
-        return func.abs(*args)
+    def abs(self, arg):
+        return func.abs(arg)
 
-    def datepart(self, args: list):
-        return func.date_part(*args)
+    def datepart(self, part, arg):
+        return func.date_part(part, arg)
 
-    def datetrunc(self, args: list):
-        return func.date_trunc(*args)
+    def datetrunc(self, part, arg):
+        return func.date_trunc(part, arg)
 
-    def datediff(self, args: list):
-        return func.datediff(*args)
+    def datediff(self, part, start, end):
+        return func.datediff(part, start, end)
 
-    def now(self, _):
+    def now(self):
         return func.now()
 
-    def today(self, _):
-        return self.todate(func.now())  # TODO: call self.now()
+    def today(self):
+        return self.todate(self.now())
 
-    def coalesce(self, args: list):
+    def coalesce(self, *args):
         return func.coalesce(*args)
 
-    def tointeger(self, args: list):
-        return cast(args[0], Integer)
+    def tointeger(self, arg):
+        return cast(arg, Integer)
 
-    def tofloat(self, args: list):
-        return cast(args[0], Float)
+    def tofloat(self, arg):
+        return cast(arg, Float)
 
-    def todate(self, args: list):
-        return cast(args[0], Date)
+    def todate(self, arg):
+        return cast(arg, Date)
 
-    def todatetime(self, args: list):
-        return cast(args[0], DateTime)
+    def todatetime(self, arg):
+        return cast(arg, DateTime)
 
     def _table(self, source: Union[str, Dict]):
         if isinstance(source, str):

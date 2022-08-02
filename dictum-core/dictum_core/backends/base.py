@@ -178,7 +178,7 @@ class Compiler(ABC):
         the arguments. Calls the method on self.
         """
         call = getattr(self, fn)
-        return call(args)
+        return call(*args)
 
     def call_window(
         self, fn: str, args: list, partition: list, order: list, rows: list
@@ -260,7 +260,7 @@ class Compiler(ABC):
         else: else value (optional)
         """
 
-    def IF(self, args: list):
+    def IF(self, *args):
         whens, else_ = _get_whens_else(args)
         return self.case(whens, else_=else_)
 
@@ -268,111 +268,111 @@ class Compiler(ABC):
     # aggregate
 
     @abstractmethod
-    def sum(self, args: list):
+    def sum(self, arg):
         """Aggregate sum"""
 
     @abstractmethod
-    def avg(self, args: list):
+    def avg(self, arg):
         """Aggregate average"""
 
     @abstractmethod
-    def min(self, args: list):
+    def min(self, arg):
         """Aggregate minimum"""
 
     @abstractmethod
-    def max(self, args: list):
+    def max(self, arg):
         """Aggregate maximum"""
 
     @abstractmethod
-    def count(self, args: list):
+    def count(self, arg=None):  # arg can be missing
         """Aggregate count, with optional argument"""
 
     @abstractmethod
-    def countd(self, args: list):
+    def countd(self, arg):
         """Aggregate distinct count"""
 
     # window functions
 
     @abstractmethod
-    def window_sum(self, args, partition_by, order_by, rows):
+    def window_sum(self, arg, partition_by, order_by, rows):
         """A windowed version of aggregate sum function"""
 
     @abstractmethod
-    def window_row_number(self, args, partition_by, order_by, rows):
+    def window_row_number(self, arg, partition_by, order_by, rows):
         """Same as SQL row_number"""
 
-    def window_avg(self, args, partition, order, rows):
+    def window_avg(self, arg, partition, order, rows):
         """TODO"""
 
-    def window_min(self, args, partition, order, rows):
+    def window_min(self, arg, partition, order, rows):
         """TODO"""
 
-    def window_max(self, args, partition, order, rows):
+    def window_max(self, arg, partition, order, rows):
         """TODO"""
 
-    def window_count(self, args, partition, order, rows):
+    def window_count(self, arg, partition, order, rows):
         """TODO"""
 
     # scalar functions
 
     @abstractmethod
-    def abs(self, args: list):
+    def abs(self, arg):
         """Absolute numeric value"""
 
     @abstractmethod
-    def floor(self, args: list):
+    def floor(self, arg):
         """Numeric floor"""
 
     @abstractmethod
-    def ceil(self, args: list):
+    def ceil(self, arg):
         """Numeric ceiling"""
 
     @abstractmethod
-    def coalesce(self, args: list):
+    def coalesce(self, *args):
         """NULL-coalescing"""
 
     # type casting
 
     @abstractmethod
-    def tointeger(self, args: list):
+    def tointeger(self, arg):
         """cast as int"""
 
     @abstractmethod
-    def tofloat(self, args: list):
+    def tofloat(self, arg):
         """cast as float"""
 
     @abstractmethod
-    def todate(self, args: list):
+    def todate(self, arg):
         """cast as date"""
 
     @abstractmethod
-    def todatetime(self, args: list):
+    def todatetime(self, arg):
         """cast as datetime/timestamp"""
 
     # dates
 
     @abstractmethod
-    def datepart(self, args: list):
+    def datepart(self, part, arg):
         """Part of a date as an integer. First arg is part as a string, e.g. 'month',
         second is date/datetime.
         """
 
     @abstractmethod
-    def datetrunc(self, args: list):
+    def datetrunc(self, part, arg):
         """Date truncated to a given part. Args same as datepart."""
 
     @abstractmethod
-    def datediff(self, args: list):
+    def datediff(self, part, start, end):
         """Difference between two dates, given as number of times there's a change of
         date at the given level.
         """
 
     @abstractmethod
-    def now(self, args: list):
+    def now(self):
         """Current timestamp"""
 
     @abstractmethod
-    def today(self, args: list):
+    def today(self):
         """Today's date"""
 
     # compilation
