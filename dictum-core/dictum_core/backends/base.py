@@ -423,6 +423,9 @@ class BackendRegistry(UserDict):
     def __str__(self) -> str:
         return str(self.registry)
 
+    def __iter__(self):
+        return iter(self.registry)
+
 
 class Backend(ABC):
     """User-facing. Gets connection details, knows about it's compiler. Compiles
