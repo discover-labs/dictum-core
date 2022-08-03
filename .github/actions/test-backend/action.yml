@@ -10,6 +10,7 @@ runs:
 
     - uses: actions/checkout@v3
       with:
+        fetch-depth: 0  # fetch all tags
         repository: discover-labs/dictum-backend-${{ inputs.backend }}
         path: ${{ inputs.backend }}
 
@@ -22,17 +23,18 @@ runs:
       working-directory: dictum-core
       shell: bash
 
-    - run: echo ${{ steps.find_tag.outputs.tag }}
+    - run: git checkout ${{ steps.find_tag.outputs.tag }}
+      shell: bash
+      working-directiry: ${{ inputs.backend }}
+
+    - run: poetry build
+      working-directory: ${{ inputs.backend }}
       shell: bash
 
-    # - run: poetry build
-    #   working-directory: ${{ inputs.backend }}
-    #   shell: bash
+    - run: poetry run pip install ../${{ inputs.backend }}/dist/*.whl
+      working-directory: dictum-core
+      shell: bash
 
-    # - run: poetry run pip install ../${{ inputs.backend }}/dist/*.whl
-    #   working-directory: dictum-core
-    #   shell: bash
-
-    # - run: poetry run pytest ../${{ inputs.backend }}/tests/
-    #   working-directory: dictum-core
-    #   shell: bash
+    - run: poetry run pytest ../${{ inputs.backend }}/tests/
+      working-directory: dictum-core
+      shell: bash
