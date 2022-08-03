@@ -17,7 +17,7 @@ runs:
       working-directory: dictum-core
       shell: bash
 
-    - run: echo "::set-output name=tag::$(git --git-dir ../${{ inputs.backend }} tag | poetry run python -m dictum_core.utils.version)"
+    - run: echo "::set-output name=tag::$(git -C ../${{ inputs.backend }} tag | poetry run python -m dictum_core.utils.version)"
       id: find_tag
       working-directory: dictum-core
       shell: bash
