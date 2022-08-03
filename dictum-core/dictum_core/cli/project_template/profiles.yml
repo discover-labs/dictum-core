@@ -1,5 +1,6 @@
 default_profile: {{ profile }}
-{{ profile }}:
-  type: {{ backend }}
-  parameters:
-{{ backend_parameters }}
+profiles:
+  {{ profile }}:
+    type: {{ backend }}
+    parameters:
+      {{ backend_parameters | indent(4) }}

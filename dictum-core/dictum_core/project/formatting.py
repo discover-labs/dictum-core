@@ -36,7 +36,7 @@ class Formatter:
 
     def format_value(self, value, format: schema.FormatConfig) -> Optional[str]:
         if value is None:
-            return None
+            return ""
         if format.kind == "string":
             return str(value)
         if format.kind == "currency":

@@ -19,22 +19,6 @@ from dictum_core.schema import Query
 
 
 class Project:
-    """
-    Internally Dictum works with two main classes: ``Store``, which contains all you
-    tables, metrics and dimensions; and ``Connection``, which represents a concrete
-    backend implementation. ``Store`` takes a query and transforms it into a
-    ``Computation`` object, which is then compiled to SQL by the Connection and
-    executed.
-
-    The ``Project`` class exists to bring everything together. This is what we advise to
-    use during the development of your data model.
-
-    Note that this class will read and build the data model on each invocation, so it
-    only makes sense to use it if your data model changes between invocations. For
-    interactive analysis and applications, see ``CachedProject``, which will read the
-    model only once.
-    """
-
     def __init__(
         self,
         path: Optional[Union[str, Path]] = None,

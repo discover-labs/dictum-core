@@ -209,8 +209,12 @@ class MeasureTransformer(Transformer):
         return Tree("column", [self._table.id, *children])
 
     def measure(self, children: list):
-        measure_id = children[0]
-        return self._measures[measure_id].expr.children[0]
+        ref_id = children[0]
+        measure = self._measures[ref_id]
+        expr = measure.expr.children[0]
+        if measure.missing is not None:
+            expr = Tree("call", ["coalesce", expr, value_to_token(measure.missing)])
+        return expr
 
     def dimension(self, children: list):
         dimension_id = children[0]

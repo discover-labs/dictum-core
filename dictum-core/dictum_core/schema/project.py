@@ -51,6 +51,8 @@ def _load_dict_from_path(path: Union[str, Path]) -> dict:
     path = Path(path)
     if path.is_file():
         result = _load_yaml_template(path)
+        if result is None:
+            result = {}
         if not isinstance(result, dict):
             raise TypeError(f"Error loading {path}: top-level object must be a dict")
         return result
