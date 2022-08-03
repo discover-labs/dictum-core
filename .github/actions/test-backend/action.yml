@@ -25,7 +25,7 @@ runs:
 
     - run: git checkout ${{ steps.find_tag.outputs.tag }}
       shell: bash
-      working-directiry: ${{ inputs.backend }}
+      working-directory: ${{ inputs.backend }}
 
     - run: poetry build
       working-directory: ${{ inputs.backend }}
