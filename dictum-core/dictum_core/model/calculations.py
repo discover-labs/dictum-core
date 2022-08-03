@@ -1,6 +1,6 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from functools import cached_property
+from dictum_core.compat import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 
 from lark import Transformer, Tree

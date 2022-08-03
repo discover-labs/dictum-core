@@ -1,6 +1,6 @@
 import inspect
 from collections import UserDict
-from functools import cached_property
+from dictum_core.compat import cached_property
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
