@@ -1,4 +1,4 @@
-from functools import cache
+from functools import lru_cache
 from typing import Optional
 
 from babel.core import Locale
@@ -9,6 +9,8 @@ currency_symbol_overrides = {
     "RUB": "₽",
     None: "",
 }
+
+cache = lru_cache(maxsize=None)
 
 
 @cache

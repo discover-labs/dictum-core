@@ -1270,6 +1270,7 @@ python-versions = ">=3.6.3,<4.0.0"
 [package.dependencies]
 commonmark = ">=0.9.0,<0.10.0"
 pygments = ">=2.6.0,<3.0.0"
+typing-extensions = {version = ">=4.0.0,<5.0", markers = "python_version < \"3.9\""}
 
 [package.extras]
 jupyter = ["ipywidgets (>=7.5.1,<8.0.0)"]
@@ -1510,8 +1511,8 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "pytest-
 
 [metadata]
 lock-version = "1.1"
-python-versions = "^3.9"
-content-hash = "83e5c2f7f6b01da39f3388cd122e3ed77c640e6df086d567ce363e361c7dafea"
+python-versions = ">=3.8,<4"
+content-hash = "26a056bcbc4520f1619d8e134cef2de11e2c2a5e0c30994d76fc198a4546d59d"
 
 [metadata.files]
 altair = [
