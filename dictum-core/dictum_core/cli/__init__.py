@@ -1,5 +1,4 @@
 import shutil
-import textwrap
 from pathlib import Path
 
 import typer
@@ -19,7 +18,7 @@ backends = list(Backend.registry)
 
 @app.command()
 def new(
-    project_dir: str = typer.Option(None, help="Project directory"),
+    project_dir: str = typer.Argument(None, help="Project directory"),
     project_name: str = typer.Option(None, help="Project name"),
     backend: str = typer.Option(None, help="Project backend"),
     default_profile: str = typer.Option(None, help="Default profile name"),
@@ -52,16 +51,13 @@ def new(
         project_dir.mkdir()
 
     backend_parameters = yaml.safe_dump(
-        Backend.registry[backend].parameters(),
-        sort_keys=False,
-        indent=2,
-        # encoding="UTF-8",
+        Backend.registry[backend].parameters(), sort_keys=False
     )
     template_vars = {
         "project_name": project_name,
         "backend": backend,
         "profile": default_profile,
-        "backend_parameters": textwrap.indent(backend_parameters, "    "),
+        "backend_parameters": backend_parameters,
     }
 
     for path in template_path.iterdir():
