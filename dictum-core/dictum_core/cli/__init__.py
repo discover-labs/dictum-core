@@ -8,12 +8,13 @@ from rich.console import Console
 from rich.prompt import IntPrompt, Prompt
 
 from dictum_core.backends.base import Backend
-from dictum_core.cli.project_template import path as template_path
 
 app = typer.Typer()
 console = Console()
 
 backends = list(Backend.registry)
+
+template_path = Path(__file__).parent / "project_template"
 
 
 @app.command()
@@ -33,7 +34,7 @@ def new(
         console.print("[red]Project directory must be empty")
         exit()
     if project_name is None:
-        project_name = Prompt.ask("[bold blue]Project name")
+        project_name = Prompt.ask("[bold blue]Project name", default=project_dir.name)
     if backend is None:
         backend_options = "\n".join(f"{i+1}. {name}" for i, name in enumerate(backends))
         backend_prompt = (
@@ -61,8 +62,8 @@ def new(
     }
 
     for path in template_path.iterdir():
-        if path.name == "__init__.py":
-            continue  # skip __init__.py
+        if path.name in {"__init__.py", ".gitkeep"}:
+            continue
         new_path = project_dir / path.relative_to(template_path)
         if path.is_file():
             template = Template(path.read_text())
