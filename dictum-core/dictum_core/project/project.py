@@ -1,5 +1,5 @@
 import importlib
-from dictum_core.compat import cached_property
+from functools import cached_property
 from pathlib import Path
 from typing import Optional, Union
 

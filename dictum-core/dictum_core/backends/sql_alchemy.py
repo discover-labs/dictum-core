@@ -1,5 +1,5 @@
 import logging
-from dictum_core.compat import cached_property
+from functools import cached_property
 from typing import Any, Dict, List, Optional, Union
 
 import sqlparse

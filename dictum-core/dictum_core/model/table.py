@@ -1,6 +1,6 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from dictum_core.compat import cached_property
+from functools import cached_property
 from typing import Dict, List, Optional, Tuple
 
 from lark import Tree
