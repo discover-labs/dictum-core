@@ -32,6 +32,50 @@ def test_dimension_same_table_as_measures(chinook: Model):
     )
 
 
+def test_resolve_measures(chinook: Model):
+    assert chinook.measures["arppu"].expr == Tree(
+        "expr",
+        [
+            Tree(
+                "div",
+                [
+                    Tree(
+                        "call",
+                        [
+                            "coalesce",
+                            Tree(
+                                "call",
+                                [
+                                    "sum",
+                                    Tree(
+                                        "mul",
+                                        [
+                                            Tree(
+                                                "column", ["invoice_items", "UnitPrice"]
+                                            ),
+                                            Tree(
+                                                "column", ["invoice_items", "Quantity"]
+                                            ),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            Token("INTEGER", "0"),
+                        ],
+                    ),
+                    Tree(
+                        "call",
+                        [
+                            "countd",
+                            Tree("column", ["invoice_items", "invoice", "CustomerId"]),
+                        ],
+                    ),
+                ],
+            )
+        ],
+    )
+
+
 def test_resolve_metrics(chinook: Model):
     assert chinook.metrics.get("revenue_per_track").expr.children[0] == Tree(
         "div",
