@@ -77,7 +77,9 @@ class Model(BaseModel):
         def _set(calculation: dict):
             if calculation.get("format") == "currency":
                 calculation["format"] = dict(kind="currency", currency=currency)
-            if calculation.get("format", {}).get("kind") == "currency":
+            elif isinstance(calculation.get("format"), str):
+                return
+            elif calculation.get("format", {}).get("kind") == "currency":
                 calculation["format"].setdefault("currency", currency)
 
         for table in value.get("tables", {}).values():
