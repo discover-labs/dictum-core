@@ -263,3 +263,10 @@ def test_datetime(compute_results: callable):
     assert isinstance(results, list)
     assert isinstance(results[0], dict)
     assert isinstance(results[0]["invoice_datetime"], datetime.datetime)
+
+
+def test_division(compute_results: callable):
+    """Test division semantics with an integer."""
+    query = Query.parse_obj({"metrics": [{"metric": {"id": "pct_music_orders"}}]})
+    results = compute_results(query)
+    assert round(results[0]["pct_music_orders"], 2) == 0.95

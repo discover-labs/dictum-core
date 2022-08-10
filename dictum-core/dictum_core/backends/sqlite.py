@@ -48,6 +48,10 @@ class SQLiteFunctionsMixin:
             else_=cast(arg, Integer),
         )
 
+    def div(self, a, b):
+        """Fix integer division semantics"""
+        return a / self.tofloat(b)
+
     def todate(self, arg):
         return func.date(arg)
 
