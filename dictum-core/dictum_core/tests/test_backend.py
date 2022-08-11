@@ -213,6 +213,12 @@ def test_datepart(compute):
     assert datepart("minute") == 5
     assert datepart("second") == 38
 
+    # Monday is 1, Sunday is 7
+    assert datepart("dow") == 7
+    assert datepart("dayofweek") == 7
+    assert compute("datepart('dow', toDatetime('2022-08-08'))", "int") == "1"
+    assert compute("datepart('dayofweek', toDatetime('2022-08-08'))", "int") == "1"
+
 
 def test_datediff(compute):
     def datediff(part, s, e):

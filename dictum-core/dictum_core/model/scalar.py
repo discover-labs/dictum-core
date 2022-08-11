@@ -261,6 +261,15 @@ class SecondTransform(ShortDatepartTransform):
     name = "Second"
 
 
+class DayOfWeekTransform(ShortDatepartTransform):
+    id = "dayofweek"
+    name = "Day of Week"
+
+
+class DowTransform(DayOfWeekTransform):
+    id = "dow"
+
+
 date_skeletons = {
     "year": "y",
     "quarter": "yQQQ",

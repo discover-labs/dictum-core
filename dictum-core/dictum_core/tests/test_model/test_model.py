@@ -144,7 +144,7 @@ def test_resolve_related_aggregate_dimension(chinook: Model):
 
 
 def test_inject_default_filters_and_transforms(chinook: Model):
-    assert len(chinook.scalar_transforms) == 24
+    assert len(chinook.scalar_transforms) == 26
 
 
 def test_metric_missing(chinook: Model):

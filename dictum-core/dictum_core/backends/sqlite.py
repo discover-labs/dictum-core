@@ -83,6 +83,10 @@ class SQLiteFunctionsMixin:
             Integer,
         )
 
+    def datepart_dayofweek(self, arg):
+        value = cast(func.strftime("%w", arg), Integer)
+        return case({0: 7}, value=value, else_=value)
+
     def datepart(self, part, arg):
         part = part.lower()
         fmt = part_formats.get(part)
@@ -90,6 +94,8 @@ class SQLiteFunctionsMixin:
             return cast(func.strftime(fmt, arg), Integer)
         if part == "quarter":
             return self.datepart_quarter(arg)
+        if part in {"dow", "dayofweek"}:
+            return self.datepart_dayofweek(arg)
         raise ValueError(
             "Valid values for datepart part are year, quarter, "
             "month, week, day, hour, minute, second — "
