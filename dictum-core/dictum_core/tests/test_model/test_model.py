@@ -151,3 +151,10 @@ def test_metric_missing(chinook: Model):
     assert chinook.metrics.get("revenue").expr.children[0] == Tree(
         "call", ["coalesce", Tree("measure", ["revenue"]), Token("INTEGER", 0)]
     )
+
+
+def test_get_lineage(chinook: Model):
+    L = list(chinook.get_lineage(chinook.metrics["revenue_per_track"]))
+    assert len(L) == 6
+    assert L[0]["type"] == "Metric"
+    assert L[0]["id"].startswith("Metric:")

@@ -1,3 +1,9 @@
 {% import "macros.html.j2" as m %}
 
 {{ m.display_calculation(calculation) }}
+
+<div style="margin-top: 2em">
+{% if lineage is not none %}
+{{ lineage | safe }}
+{% endif %}
+</div>
