@@ -1,5 +1,5 @@
 {% macro display_calculation(calculation) %}
-{% set prefix = "$" if calculation.is_measure is defined else ":" %}
+{% set prefix = ":" if calculation.__class__.__name__ == "Dimension" else "$" %}
 
 <h3>{{ calculation.name }}</h3>
 <code>{{ prefix }}{{ calculation.id }}</code>

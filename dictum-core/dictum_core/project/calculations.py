@@ -1,4 +1,6 @@
 from typing import Dict
+from copy import deepcopy
+import altair as alt
 
 import dictum_core.model
 import dictum_core.project
@@ -15,6 +17,7 @@ from dictum_core.schema.query import (
     QueryScalarTransform,
     QueryTableTransform,
 )
+from dictum_core.project.templates import lineage_spec
 
 scalar_transforms = set(scalar_transforms)
 table_transforms = set(table_transforms) | set(limit_transforms)
@@ -39,13 +42,14 @@ class ProjectCalculation(AltairEncodingChannelHook):
     def _repr_html_(self):
         template = environment.get_template("calculation.html.j2")
         calculation = self.calculation
-        if (
-            isinstance(calculation, dictum_core.model.Metric)
-            and len(calculation.measures) == 1
-        ):
-            calculation = calculation.measures[0]
-        prefix = "$" if self._type == "metric" else ":"
-        return template.render(calculation=calculation, prefix=prefix)
+        lineage = None
+        if isinstance(calculation, dictum_core.model.Metric):
+            _lineage_spec = deepcopy(lineage_spec)
+            _lineage_spec["data"][0]["values"] = calculation.lineage
+            lineage = alt.renderers._plugins["html"](_lineage_spec)["text/html"]
+            if calculation.is_measure:
+                calculation = calculation.measures[0]
+        return template.render(calculation=calculation, lineage=lineage)
 
     def name(self, name: str):
         self.request.alias = name

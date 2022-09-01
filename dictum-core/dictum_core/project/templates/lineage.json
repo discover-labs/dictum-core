@@ -1,0 +1,231 @@
+{
+    "$schema": "https://vega.github.io/schema/vega/v5.json",
+    "width": 500,
+    "height": 100,
+    "padding": 5,
+    "data": [
+        {
+            "name": "lineage",
+            "values": [
+                {
+                    "id": "Metric:arppu",
+                    "name": "arppu",
+                    "parent": null,
+                    "type": "Metric"
+                },
+                {
+                    "id": "Measure:arppu",
+                    "name": "arppu",
+                    "parent": "Metric:arppu",
+                    "type": "Measure"
+                },
+                {
+                    "id": "invoice_items.*",
+                    "type": "Column",
+                    "parent": "Measure:arppu",
+                    "name": "invoice_items.*"
+                },
+                {
+                    "id": "Measure:revenue",
+                    "name": "revenue",
+                    "parent": "Measure:arppu",
+                    "type": "Measure"
+                },
+                {
+                    "id": "invoice_items.UnitPrice",
+                    "type": "Column",
+                    "parent": "Measure:revenue",
+                    "name": "invoice_items.UnitPrice"
+                },
+                {
+                    "id": "invoice_items.Quantity",
+                    "type": "Column",
+                    "parent": "Measure:revenue",
+                    "name": "invoice_items.Quantity"
+                },
+                {
+                    "id": "Measure:unique_paying_customers",
+                    "name": "unique_paying_customers",
+                    "parent": "Measure:arppu",
+                    "type": "Measure"
+                },
+                {
+                    "id": "invoice_items.invoice",
+                    "type": "Column",
+                    "parent": "Measure:unique_paying_customers",
+                    "name": "invoice_items.invoice"
+                }
+            ],
+            "transform": [
+                {
+                    "type": "stratify",
+                    "key": "id",
+                    "parentKey": "parent"
+                },
+                {
+                    "type": "tree",
+                    "method": "cluster",
+                    "size": [
+                        {
+                            "signal": "height"
+                        },
+                        {
+                            "signal": "width"
+                        }
+                    ],
+                    "separation": false,
+                    "as": [
+                        "y",
+                        "x",
+                        "depth",
+                        "children"
+                    ]
+                },
+                {
+                    "type": "formula",
+                    "expr": "width - datum.x",
+                    "as": "x"
+                }
+            ]
+        },
+        {
+            "name": "links",
+            "source": "lineage",
+            "transform": [
+                {
+                    "type": "treelinks"
+                },
+                {
+                    "type": "linkpath",
+                    "orient": "horizontal",
+                    "shape": "diagonal"
+                }
+            ]
+        }
+    ],
+    "scales": [
+        {
+            "name": "color",
+            "type": "ordinal",
+            "domain": [
+                "Metric",
+                "Measure",
+                "Dimension",
+                "Column"
+            ],
+            "range": [
+                "#7278FF",
+                "#74CDFF",
+                "#FF845E",
+                "#FF5757"
+            ]
+        }
+    ],
+    "legends": [
+        {
+            "type": "symbol",
+            "orient": "top-right",
+            "fill": "color",
+            "direction": "horizontal",
+            "padding": 0,
+            "offset": 0,
+            "symbolSize": 75
+        }
+    ],
+    "marks": [
+        {
+            "type": "path",
+            "from": {
+                "data": "links"
+            },
+            "zindex": 0,
+            "encode": {
+                "update": {
+                    "path": {
+                        "field": "path"
+                    },
+                    "stroke": {
+                        "value": "#ccc"
+                    },
+                    "strokeOpacity": {
+                        "value": 0.5
+                    }
+                }
+            }
+        },
+        {
+            "name": "labels",
+            "type": "text",
+            "from": {
+                "data": "lineage"
+            },
+            "zindex": 2,
+            "encode": {
+                "enter": {
+                    "x": {
+                        "field": "x"
+                    },
+                    "y": {
+                        "field": "y"
+                    },
+                    "text": {
+                        "field": "name"
+                    },
+                    "align": {
+                        "value": "center"
+                    },
+                    "baseline": {
+                        "value": "middle"
+                    }
+                }
+            }
+        },
+        {
+            "type": "symbol",
+            "from": {
+                "data": "labels"
+            },
+            "zindex": 3,
+            "encode": {
+                "enter": {
+                    "x": {
+                        "signal": "datum.bounds.x1 - 7"
+                    },
+                    "y": {
+                        "signal": "datum.bounds.y1 + 6"
+                    },
+                    "fill": {
+                        "field": "datum.type",
+                        "scale": "color"
+                    }
+                }
+            }
+        },
+        {
+            "type": "rect",
+            "from": {
+                "data": "labels"
+            },
+            "zindex": 1,
+            "encode": {
+                "enter": {
+                    "x": {
+                        "signal": "datum.bounds.x1 - 12"
+                    },
+                    "y": {
+                        "field": "bounds.y1"
+                    },
+                    "x2": {
+                        "field": "bounds.x2"
+                    },
+                    "y2": {
+                        "field": "bounds.y2"
+                    },
+                    "fill": {
+                        "value": "white"
+                    }
+                }
+            }
+        }
+    ]
+}

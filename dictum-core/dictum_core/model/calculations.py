@@ -352,7 +352,7 @@ class Metric(Calculation):
 
     @cached_property
     def merged_expr(self) -> Tree:
-        """Same as expr, but measures are selected as column from the merged table"""
+        """Same as expr, but measures are selected as columns from the merged table"""
         expr = deepcopy(self.expr)
         for ref in expr.find_data("measure"):
             ref.data = "column"
@@ -372,3 +372,7 @@ class Metric(Calculation):
             set.intersection(*(set(m.dimensions) for m in self.measures)),
             key=lambda x: x.name,
         )
+
+    @cached_property
+    def lineage(self) -> List[dict]:
+        return list(self.model.get_lineage(self))

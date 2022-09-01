@@ -1,8 +1,15 @@
 import dataclasses
-from typing import Dict
+from typing import Dict, List, Optional
 
 from dictum_core import schema
-from dictum_core.model.calculations import Dimension, DimensionsUnion, Measure, Metric
+from dictum_core.model.calculations import (
+    Dimension,
+    DimensionsUnion,
+    Measure,
+    Metric,
+    Calculation,
+    TableCalculation,
+)
 from dictum_core.model.dicts import DimensionDict, MeasureDict, MetricDict
 from dictum_core.model.scalar import transforms as scalar_transforms
 from dictum_core.model.table import RelatedTable, Table, TableFilter
@@ -118,6 +125,50 @@ class Model:
             model=self,
             **metric.dict(include=table_calc_fields),
         )
+
+    def get_lineage(
+        self, calculation: Calculation, parent: Optional[str] = None
+    ) -> List[dict]:
+        """Get lineage graph for a calculation. Returns a list of dicts like:
+
+        {"id": "someid", "type": "Metric", "parent": "otherid"}
+        """
+        _id = f"{calculation.__class__.__name__}:{calculation.id}"
+        yield {
+            "id": _id,
+            "name": calculation.id,
+            "parent": parent,
+            "type": calculation.__class__.__name__,
+        }
+        expr = calculation.parsed_expr
+        table = None
+        has_refs = False
+        for k in ("metric", "measure", "dimension"):
+            attr = f"{k}s"
+            for ref in expr.find_data(k):
+                has_refs = True
+                yield from self.get_lineage(
+                    getattr(self, attr)[ref.children[0]], parent=_id
+                )
+        if isinstance(calculation, TableCalculation):
+            table = calculation.table.id
+            prefix = [table] if table is not None else []
+            for ref in expr.find_data("column"):
+                has_refs = True
+                _col = ".".join([*prefix, *ref.children])
+                yield {
+                    "id": _col,
+                    "type": "Column",
+                    "parent": _id,
+                    "name": _col,
+                }
+            if not has_refs:
+                yield {
+                    "id": table,
+                    "type": "Column",
+                    "parent": _id,
+                    "name": f"{table}.*",
+                }
 
     # def suggest_metrics(self, query: schema.Query) -> List[Measure]:
     #     """Suggest a list of possible metrics based on a query.
