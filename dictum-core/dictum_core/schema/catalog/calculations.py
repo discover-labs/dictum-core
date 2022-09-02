@@ -1,0 +1,32 @@
+from pydantic import BaseModel, Field
+from typing import Optional, List, Literal
+
+
+class CatalogCalculation(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+    expr: str = Field(alias="str_expr")
+
+    class Config:
+        orm_mode = True
+
+
+class CatalogDimension(CatalogCalculation):
+    pass
+
+
+class MetricLineageItem(BaseModel):
+    id: str
+    name: str
+    type: Literal["Metric", "Measure", "Dimension", "Column"]
+    parent: Optional[str]
+
+
+class MetricLineage(BaseModel):
+    __root__: List[MetricLineageItem]
+
+
+class CatalogMetric(CatalogCalculation):
+    lineage: MetricLineage
+    dimensions: List[CatalogDimension]

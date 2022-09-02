@@ -10,6 +10,17 @@ from dictum_core import schema
 from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
 from dictum_core.utils import value_to_token
+from dictum_core.model.time import (
+    TimeDimension,
+    Second,
+    Minute,
+    Hour,
+    Day,
+    Week,
+    Month,
+    Quarter,
+    Year,
+)
 
 
 class ResolutionError(Exception):
@@ -254,13 +265,13 @@ class Measure(TableCalculation):
 
     @property
     def time(self) -> Dimension:
-        if self.str_time is None:
-            raise ValueError(
-                f"{self} doesn't have a time dimension specified so it "
-                "can't be used with the built-in Time dimension"
-            )
+        if self.str_time is not None:  # explicit time
+            return self.table.allowed_dimensions[self.str_time]
 
-        return self.table.allowed_dimensions[self.str_time]
+        raise ValueError(
+            f"{self} doesn't have a time dimension specified so it "
+            "can't be used with the built-in Time dimension"
+        )
 
     @cached_property
     def dimensions(self):
@@ -367,11 +378,22 @@ class Metric(Calculation):
         return result
 
     @cached_property
-    def dimensions(self) -> Dict[str, Dimension]:
+    def dimensions(self) -> List[Dimension]:
         return sorted(
             set.intersection(*(set(m.dimensions) for m in self.measures)),
             key=lambda x: x.name,
         )
+
+    @cached_property
+    def generic_time_dimensions(self) -> List[TimeDimension]:
+        """Return a list of generic time dimensions available for this metric. All of
+        them are available if generic time is defined for all measures used here.
+
+        TODO: when aggregations are available, make this grain-aware
+        """
+        if all(measure.str_time is not None for measure in self.measures):
+            return [Year, Quarter, Month, Week, Day, Hour, Minute, Second]
+        return []
 
     @cached_property
     def lineage(self) -> List[dict]:
