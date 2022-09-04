@@ -10,17 +10,8 @@ from dictum_core import schema
 from dictum_core.format import Format
 from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
-from dictum_core.model.time import (
-    Day,
-    Hour,
-    Minute,
-    Month,
-    Quarter,
-    Second,
-    TimeDimension,
-    Week,
-    Year,
-)
+from dictum_core.model.scalar import ScalarTransformMeta, transforms_by_input_type
+from dictum_core.model.time import GenericTimeDimension
 from dictum_core.utils import value_to_token
 
 
@@ -176,6 +167,10 @@ class Dimension(TableCalculation):
                 measure_id
             )
             measure.check_references(path)
+
+    @property
+    def transforms(self) -> Dict[str, ScalarTransformMeta]:
+        return transforms_by_input_type[self.type.name]
 
 
 @dataclass
@@ -381,14 +376,18 @@ class Metric(Calculation):
         )
 
     @cached_property
-    def generic_time_dimensions(self) -> List[TimeDimension]:
+    def generic_time_dimensions(self) -> List[GenericTimeDimension]:
         """Return a list of generic time dimensions available for this metric. All of
         them are available if generic time is defined for all measures used here.
 
         TODO: when aggregations are available, make this grain-aware
         """
         if all(measure.str_time is not None for measure in self.measures):
-            return [Year, Quarter, Month, Week, Day, Hour, Minute, Second]
+            return list(
+                d
+                for d in self.model.dimensions.values()
+                if isinstance(d, GenericTimeDimension)
+            )
         return []
 
     @cached_property

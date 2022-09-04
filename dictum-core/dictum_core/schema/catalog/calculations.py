@@ -1,5 +1,22 @@
+from typing import List, Literal, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, List, Literal
+
+
+class CatalogType(BaseModel):
+    name: str
+    grain: Optional[str]
+
+    class Config:
+        orm_mode = True
+
+
+class CatalogFormat(BaseModel):
+    type: CatalogType
+    d3_format: Optional[str]
+
+    class Config:
+        orm_mode = True
 
 
 class CatalogCalculation(BaseModel):
@@ -7,6 +24,7 @@ class CatalogCalculation(BaseModel):
     name: str
     description: Optional[str]
     expr: Optional[str] = Field(alias="str_expr")
+    format: CatalogFormat
 
     class Config:
         orm_mode = True

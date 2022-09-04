@@ -72,7 +72,8 @@ class Model:
                     target.measure_backlinks[measure.id] = table
 
         # add default time dimensions
-        self.dimensions.update(time_dimensions)
+        for id, time_dimension in time_dimensions.items():
+            self.dimensions[id] = time_dimension(locale=self.locale)
 
     def create_table(self, table: schema.Table):
         result = Table(

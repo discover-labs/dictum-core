@@ -7,7 +7,7 @@ from dictum_core.engine.computation import Column, RelationalQuery
 from dictum_core.engine.result import DisplayInfo
 from dictum_core.model import DimensionsUnion, Measure, Model
 from dictum_core.model.scalar import DatetruncTransform
-from dictum_core.model.time import TimeDimension
+from dictum_core.model.time import GenericTimeDimension
 from dictum_core.schema import QueryDimension, QueryDimensionRequest
 
 
@@ -49,8 +49,8 @@ class AggregateQueryBuilder:
 
         # if generic time, prepend transforms with datetrunc
         # and replace the dimension with measure's time
-        if isinstance(dimension, TimeDimension):
-            if dimension.period is not None:
+        if isinstance(dimension, GenericTimeDimension):
+            if dimension.grain is not None:
                 transforms = [DatetruncTransform(dimension.type.grain), *transforms]
                 if measure.time is None:
                     raise ValueError(

@@ -1,9 +1,11 @@
-from typing import List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional
 
 from lark import Transformer, Tree
 
 from dictum_core import engine, schema
 from dictum_core.format import Format
+from dictum_core.model.dicts import TransformDict
 from dictum_core.model.expr import parse_expr
 from dictum_core.schema import Type
 from dictum_core.utils import value_to_token
@@ -25,10 +27,17 @@ class TransformTransformer(Transformer):
         return children[0]
 
 
-transforms = {}
+class ScalarTransformMeta(type):
+    pass
 
 
-class ScalarTransform:
+transforms = TransformDict()
+transforms_by_input_type: Dict[str, TransformDict] = defaultdict(
+    lambda: TransformDict()
+)
+
+
+class ScalarTransform(metaclass=ScalarTransformMeta):
     """A scalar transform. Column in, Column out. Can change different aspects
     of the column, expression (always), name, format etc.
     """
@@ -36,14 +45,18 @@ class ScalarTransform:
     id: str
     name: str
     description: Optional[str] = None
+
     return_type: Optional[schema.Type] = None
+    input_types: List[str]
 
     def __init__(self, *args):
         self._args = [value_to_token(a) for a in args]
 
     def __init_subclass__(cls):
         if hasattr(cls, "id") and cls.id is not None:
-            transforms[cls.id] = cls
+            transforms.add(cls)
+            for input_type in cls.input_types:
+                transforms_by_input_type[input_type].add(cls)
 
     def get_name(self, name: str) -> str:
         return name
@@ -109,14 +122,18 @@ class LiteralTransform(ScalarTransform):
 
 class InvertTransform(LiteralTransform):
     id = "invert"
-    return_type = Type(name="bool")
     expr = "not (@)"
+
+    input_types: List[str] = ["bool"]
+    return_type = Type(name="bool")
 
 
 class BooleanTransform(LiteralTransform):
     args = ["value"]
-    return_type = Type(name="bool")
     op: str
+
+    input_types: List[str] = ["datetime", "int", "float", "str"]
+    return_type = Type(name="bool")
 
     def __init_subclass__(cls):
         cls.id = cls.__name__[:2].lower()
@@ -152,28 +169,36 @@ class LeTransform(BooleanTransform):
 class IsNullTransform(LiteralTransform):
     id = "isnull"
     name = "IS NULL"
-    return_type = Type(name="bool")
     expr = "@ is null"
+
+    input_types: List[str] = ["str", "bool", "int", "float", "datetime"]
+    return_type = Type(name="bool")
 
 
 class IsNotNullTransform(LiteralTransform):
     id = "isnotnull"
     name = "IS NOT NULL"
-    return_type = Type(name="bool")
     expr = "@ is not null"
+
+    input_types: List[str] = ["str", "bool", "int", "float", "datetime"]
+    return_type = Type(name="bool")
 
 
 class InRangeTransform(LiteralTransform):
     id = "inrange"
     name = "in range"
-    return_type = Type(name="bool")
     args = ["min", "max"]
     expr = "@ >= min and @ <= max"
+
+    input_types: List[str] = ["int", "float"]
+    return_type = Type(name="bool")
 
 
 class IsInTransform(ScalarTransform):
     id = "isin"
     name = "IN"
+
+    input_types: List[str] = ["string", "int"]
     return_type = Type(name="bool")
 
     def transform_expr(self, expr: Tree) -> Tree:
@@ -183,9 +208,11 @@ class IsInTransform(ScalarTransform):
 class LastTransform(LiteralTransform):
     id = "last"
     name = "last"
-    return_type = Type(name="bool")
     args = ["n", "part"]
     expr = "datediff(part, @, now()) <= n"
+
+    input_types: List[str] = ["datetime"]
+    return_type = Type(name="bool")
 
     def __init__(self, n: int, period: str):
         super().__init__(n, period)
@@ -194,17 +221,21 @@ class LastTransform(LiteralTransform):
 class StepTransform(LiteralTransform):
     id = "step"
     name = "step"
-    return_type = Type(name="int")
     args = ["size"]
     expr = "@ // size * size"
+
+    input_types: List[str] = ["float", "int"]
+    return_type = Type(name="int")
 
 
 class DatepartTransform(LiteralTransform):
     id = "datepart"
     name = "date part"
     args = ["part"]
-    return_type = Type(name="int")
     expr = "datepart(part, @)"
+
+    input_types: List[str] = ["datetime"]
+    return_type = Type(name="int")
 
     def get_format(self, format: Format) -> Format:
         return Format(
@@ -280,6 +311,8 @@ class DowTransform(DayOfWeekTransform):
 class DatetruncTransform(ScalarTransform):
     id = "datetrunc"
     name = "Truncate a date"
+
+    input_types: List[str] = ["datetime"]
     return_type = Type(name="datetime")
 
     part_to_altair_time_unit = {

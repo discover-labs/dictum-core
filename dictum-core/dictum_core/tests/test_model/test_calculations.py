@@ -16,4 +16,4 @@ def test_metric_dimensions(chinook: Model):
 
 def test_metric_generic_time_dimensions(chinook: Model):
     assert chinook.metrics["revenue_per_track"].generic_time_dimensions == []
-    assert len(chinook.metrics["avg_sold_unit_price"].generic_time_dimensions) == 8
+    assert len(chinook.metrics["avg_sold_unit_price"].generic_time_dimensions) == 10
