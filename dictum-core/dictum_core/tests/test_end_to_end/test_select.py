@@ -573,7 +573,7 @@ def test_measure_with_related_column(project: Project):
 
 def test_default_time_format(project: Project):
     result = project.select("revenue").by("invoice_date").df(format=True)
-    assert result.iloc[0]["Invoice Date"] == "1/1/09"
+    assert result.iloc[0]["Invoice Date"] == "1/1/2009"
 
 
 def test_percents_without_alias(project: Project):

@@ -6,7 +6,7 @@ class CatalogCalculation(BaseModel):
     id: str
     name: str
     description: Optional[str]
-    expr: str = Field(alias="str_expr")
+    expr: Optional[str] = Field(alias="str_expr")
 
     class Config:
         orm_mode = True
@@ -30,3 +30,4 @@ class MetricLineage(BaseModel):
 class CatalogMetric(CatalogCalculation):
     lineage: MetricLineage
     dimensions: List[CatalogDimension]
+    time: List[CatalogDimension] = Field(alias="generic_time_dimensions")

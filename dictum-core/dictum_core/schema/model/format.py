@@ -1,9 +1,8 @@
 from typing import Literal, Optional, Union
 
-from pydantic import BaseModel, Field, root_validator
+from pydantic import BaseModel, root_validator
 
 from dictum_core.schema import utils
-from dictum_core.schema.model.type import Type
 
 FormatKind = Literal[
     "number", "decimal", "percent", "currency", "date", "datetime", "string"
@@ -50,23 +49,4 @@ Format = Union[FormatKind, FormatConfig]
 
 class Formatted(BaseModel):
 
-    format: Optional[Format] = Field()
-
-    @staticmethod
-    def get_default_format(type: Type) -> FormatConfig:
-        if type in {"int", "float"}:
-            return FormatConfig(kind="number")
-        if type in {"date", "datetime"}:
-            return FormatConfig(kind=type, pattern="short")
-        if type in {"bool", "str"}:
-            return FormatConfig(kind="string")
-        raise ValueError
-
-    @root_validator
-    def set_default_format(cls, values):
-        fmt = values.get("format")
-        if fmt is None:
-            values["format"] = cls.get_default_format(values.get("type", "float"))
-        if isinstance(fmt, str):
-            values["format"] = FormatConfig(kind=fmt)
-        return values
+    format: Optional[Format]

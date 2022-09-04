@@ -2,12 +2,13 @@ import dataclasses
 from typing import Dict, List, Optional
 
 from dictum_core import schema
+from dictum_core.format import Format
 from dictum_core.model.calculations import (
+    Calculation,
     Dimension,
     DimensionsUnion,
     Measure,
     Metric,
-    Calculation,
     TableCalculation,
 )
 from dictum_core.model.dicts import DimensionDict, MeasureDict, MetricDict
@@ -15,7 +16,7 @@ from dictum_core.model.scalar import transforms as scalar_transforms
 from dictum_core.model.table import RelatedTable, Table, TableFilter
 from dictum_core.model.time import dimensions as time_dimensions
 
-displayed_fields = {"id", "name", "description", "type", "format", "missing"}
+displayed_fields = {"id", "name", "description", "missing"}
 
 table_calc_fields = displayed_fields | {"str_expr"}
 
@@ -37,7 +38,9 @@ class Model:
         # add unions
         for union in model.unions.values():
             self.dimensions[union.id] = DimensionsUnion(
-                **union.dict(include=displayed_fields)
+                **union.dict(include=displayed_fields),
+                format=Format(type=union.type, config=union.format, locale=self.locale),
+                type=union.type,
             )
 
         # add all tables, their relationships and calculations
@@ -89,16 +92,24 @@ class Model:
     def add_measure(self, measure: schema.Measure, table: Table) -> Measure:
         result = Measure(
             table=table,
+            type=measure.type,
+            format=Format(type=measure.type, config=measure.format, locale=self.locale),
             **measure.dict(include=table_calc_fields | {"str_filter", "str_time"}),
         )
         if measure.metric:
-            self.metrics.add(Metric.from_measure(measure, self))
+            self.metrics.add(Metric.from_measure(result, self))
         table.measures.add(result)
         self.measures.add(result)
 
     def add_dimension(self, dimension: schema.Dimension, table: Table) -> Dimension:
         result = Dimension(
             table=table,
+            type=dimension.type,
+            format=Format(
+                locale=self.locale,
+                type=dimension.type,
+                config=dimension.format,
+            ),
             **dimension.dict(include=table_calc_fields),
         )
         table.dimensions[result.id] = result
@@ -108,8 +119,16 @@ class Model:
                     f"Duplicate union dimension {dimension.union} "
                     f"on table {table.id}"
                 )
+            union = self.dimensions.get(dimension.union)
             table.dimensions[dimension.union] = dataclasses.replace(
-                result, id=dimension.union, is_union=True
+                result,
+                id=union.id,
+                name=union.name,
+                description=union.description,
+                type=union.type,
+                format=union.format,
+                missing=union.missing,
+                is_union=True,
             )
         self.dimensions.add(result)
 
@@ -117,12 +136,17 @@ class Model:
         if metric.table is not None:
             # table is specified, treat as that table's measure
             table = self.tables.get(metric.table)
-            measure = schema.Measure(**metric.dict(by_alias=True), metric=True)
+            measure = schema.Measure(
+                **metric.dict(by_alias=True),
+                metric=True,
+            )
             return self.add_measure(measure, table)
 
         # no, it's a real metric
         self.metrics[metric.id] = Metric(
             model=self,
+            type=metric.type,
+            format=Format(locale=self.locale, type=metric.type, config=metric.format),
             **metric.dict(include=table_calc_fields),
         )
 
@@ -232,10 +256,10 @@ class Model:
         currencies = set()
         for request in query.metrics:
             metric = self.metrics.get(request.metric.id)
-            if metric.format is not None and metric.format.currency is not None:
+            if metric.format.currency is not None:
                 currencies.add(metric.format.currency)
         for request in query.dimensions:
             dimension = self.dimensions.get(request.dimension.id)
-            if dimension.format is not None and dimension.format.currency is not None:
+            if dimension.format.currency is not None:
                 currencies.add(dimension.format.currency)
         return currencies

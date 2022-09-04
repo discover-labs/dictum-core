@@ -39,8 +39,7 @@ class Analysis:
         if len(result.data) == 0:
             return DataFrame(result.data)
         formatter = Formatter(
-            locale=self.project.model.locale,
-            formats={k: v.format for k, v in result.display_info.items()},
+            formats={k: v.format for k, v in result.display_info.items()}
         )
         df = DataFrame(formatter.format(result.data))
         df.columns = [result.display_info[c].display_name for c in df.columns]

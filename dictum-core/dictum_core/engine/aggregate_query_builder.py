@@ -51,7 +51,7 @@ class AggregateQueryBuilder:
         # and replace the dimension with measure's time
         if isinstance(dimension, TimeDimension):
             if dimension.period is not None:
-                transforms = [DatetruncTransform(dimension.period), *transforms]
+                transforms = [DatetruncTransform(dimension.type.grain), *transforms]
                 if measure.time is None:
                     raise ValueError(
                         f"You requested a generic Time dimension with {measure}, "
@@ -77,6 +77,7 @@ class AggregateQueryBuilder:
             display_info=DisplayInfo(
                 display_name=display_name,
                 column_name=request.name,
+                type=dimension.type,
                 format=dimension.format,
                 kind="dimension",
                 keep_display_name=(request.alias is not None),

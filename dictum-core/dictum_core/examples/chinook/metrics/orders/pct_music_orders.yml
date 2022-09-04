@@ -2,3 +2,4 @@ name: Percentage of Music Sold
 expr: count(case when :music then 1 end) / $items_sold
 table: invoice_items
 format: percent
+time: sale_date

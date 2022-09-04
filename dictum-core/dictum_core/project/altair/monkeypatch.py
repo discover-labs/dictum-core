@@ -38,7 +38,6 @@ from toolz.curried import curry
 from dictum_core.engine.computation import DisplayInfo
 from dictum_core.project.altair.data import DictumData
 from dictum_core.project.altair.encoding import AltairEncodingChannelHook, filter_fields
-from dictum_core.project.altair.format import format_config_to_d3_format
 from dictum_core.project.altair.locale import (
     cldr_locale_to_d3_number,
     cldr_locale_to_d3_time,
@@ -234,18 +233,16 @@ type_to_encoding_type_dimensions = {
 def get_default_encoding_type(info: DisplayInfo):
     """Get a default encoding type based on the column's DisplayInfo"""
     if info.kind == "metric":
-        return type_to_encoding_type_metrics[info.type]
-    return type_to_encoding_type_dimensions[info.type]
+        return type_to_encoding_type_metrics[info.type.name]
+    return type_to_encoding_type_dimensions[info.type.name]
 
 
-def build_default_tooltip(
-    query: Query, info: Dict[str, DisplayInfo], locale: str
-) -> List[dict]:
+def build_default_tooltip(query: Query, info: Dict[str, DisplayInfo]) -> List[dict]:
     result = []
     for request in chain(query.dimensions, query.metrics):
         field = request.name
         title = info[field].display_name
-        format = format_config_to_d3_format(info[field].format, locale=locale)
+        format = info[field].format.d3_format
         item = {
             "field": field,
             "title": title,
@@ -291,7 +288,7 @@ def render_self(self):
 
                 info = result.display_info[channel.field]
                 title = {"title": info.display_name}
-                fmt = format_config_to_d3_format(info.format, model.locale)
+                fmt = info.format.d3_format
                 if fmt is not None:
                     title["format"] = fmt
 
@@ -315,7 +312,7 @@ def render_self(self):
             tooltip_unit = unit.spec
         if tooltip_unit.encoding.tooltip is Undefined:
             tooltip_unit.encoding.tooltip = build_default_tooltip(
-                query, result.display_info, model.locale
+                query, result.display_info
             )
 
     if len(currencies) == 1:

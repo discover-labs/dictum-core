@@ -7,20 +7,21 @@ from lark import Transformer, Tree
 
 import dictum_core.model
 from dictum_core import schema
+from dictum_core.format import Format
 from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
-from dictum_core.utils import value_to_token
 from dictum_core.model.time import (
-    TimeDimension,
-    Second,
-    Minute,
-    Hour,
     Day,
-    Week,
+    Hour,
+    Minute,
     Month,
     Quarter,
+    Second,
+    TimeDimension,
+    Week,
     Year,
 )
+from dictum_core.utils import value_to_token
 
 
 class ResolutionError(Exception):
@@ -33,12 +34,8 @@ class Displayed:
     name: str
     description: str
     type: schema.Type
-    format: Optional[schema.FormatConfig]
+    format: Optional[Format]
     missing: Optional[Any]
-
-    def __post_init__(self):
-        if isinstance(self.format, dict):
-            self.format = schema.FormatConfig.parse_obj(self.format)
 
 
 @dataclass
@@ -239,7 +236,6 @@ class Measure(TableCalculation):
     str_time: Optional[str] = None
 
     def __post_init__(self):
-        super().__post_init__()
         if self.kind != "aggregate":
             raise ValueError(
                 f"Measures must be aggregate, {self} expression is not: {self.str_expr}"
@@ -380,7 +376,7 @@ class Metric(Calculation):
     @cached_property
     def dimensions(self) -> List[Dimension]:
         return sorted(
-            set.intersection(*(set(m.dimensions) for m in self.measures)),
+            set.intersection(*(set(d for d in m.dimensions) for m in self.measures)),
             key=lambda x: x.name,
         )
 

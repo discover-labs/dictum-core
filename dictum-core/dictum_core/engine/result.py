@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 
 from dictum_core import schema
+from dictum_core.format import Format
 
 
 @dataclass
@@ -31,7 +32,7 @@ class DisplayInfo:
 
     display_name: str
     column_name: str
-    format: schema.FormatConfig
+    format: Format
     kind: DisplayColumnKind
     type: Optional[schema.Type] = None
     keep_display_name: bool = False

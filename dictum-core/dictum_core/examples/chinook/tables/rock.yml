@@ -17,4 +17,5 @@ measures:
     expr: sum(UnitPrice * Quantity)
     format: currency
     missing: 0
+    time: sale_date
     metric: True

@@ -1,4 +1,4 @@
-from dictum_core.project.altair.format import ldml_number_to_d3_format
+from dictum_core.format.d3 import ldml_number_to_d3_format
 
 
 def test_sign():

@@ -3,7 +3,7 @@ from typing import Optional
 
 from babel.core import Locale
 
-import dictum_core.project.altair.format
+from dictum_core.format.d3 import ldml_date_to_d3_time_format
 
 currency_symbol_overrides = {
     "RUB": "₽",
@@ -40,12 +40,8 @@ def cldr_locale_to_d3_number(locale: str, currency: Optional[str] = None):
 def cldr_locale_to_d3_time(locale: str):
     data = load_locale(locale)
     days = [6] + list(range(6))  # days in d3 start from Sunday
-    short_date = dictum_core.project.altair.format.ldml_date_to_d3_time_format(
-        data.date_formats["short"].pattern
-    )
-    short_time = dictum_core.project.altair.format.ldml_date_to_d3_time_format(
-        data.time_formats["short"].pattern
-    )
+    short_date = ldml_date_to_d3_time_format(data.date_formats["short"].pattern)
+    short_time = ldml_date_to_d3_time_format(data.time_formats["short"].pattern)
     datetime = data.datetime_formats["short"].format(short_time, short_date)
     return {
         "dateTime": datetime,
