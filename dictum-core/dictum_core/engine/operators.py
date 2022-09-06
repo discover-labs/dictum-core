@@ -419,7 +419,7 @@ class RecordsFilterOperator(Operator):
         result = df
         for f in filters:
             columns = list(set(f.columns) & set(result.columns))
-            # in case where are duplicate tuples in columns subset
+            # in case there are duplicate tuples in columns subset
             _f = f[columns].drop_duplicates()
             result = merge(
                 result, _f, how="inner", on=columns, suffixes=["", "___drop"]
@@ -466,7 +466,7 @@ class FinalizeOperator(Operator):
                 if isna(row[k]):
                     row[k] = None
                 else:
-                    row[k] = _type_mappers[self.types[k]](v)
+                    row[k] = _type_mappers[self.types[k].name](v)
         return data
 
     def execute(self, backend: Backend):
@@ -478,7 +478,6 @@ class FinalizeOperator(Operator):
         display_info = {}
         for column in self.input.inputs[0].columns:
             info = column.display_info
-            info.type = column.type
             if column.name in self.aliases:
                 column.name = self.aliases[column.name]
                 info.name = column.name

@@ -4,3 +4,4 @@ table: invoice_items
 description: |
   Number of unique users who made an order.
 type: int
+time: invoice_date

@@ -1,81 +1,84 @@
-from dictum_core.schema import FormatConfig
+from dictum_core.format import Format
+from dictum_core.schema import Type
 
 
-class TimeDimension:
-    def __init__(cls, name, bases, attrs):
-        cls.id = name
-        cls.name = name
-        cls.period = attrs.get("period")
-        cls.pattern = attrs.get("pattern")
-        cls.skeleton = attrs.get("skeleton")
+class GenericTimeDimension:
+    type: Type
+    grain: str
+
+    _sort_counter = 0
+
+    def __init__(self, locale: str):
+        self.locale = locale
+
+    def __init_subclass__(cls):
+        cls.id = cls.__name__
+        cls.sort_order = GenericTimeDimension._sort_counter
+        GenericTimeDimension._sort_counter += 1
+
+    def __str__(self):
+        return self.__class__.__name__
 
     def __repr__(self):
-        return self.name
+        return str(self)
 
     @property
-    def format(self) -> FormatConfig:
-        if self.skeleton:
-            return FormatConfig(kind="datetime", skeleton=self.skeleton)
-        if self.pattern:
-            return FormatConfig(kind="datetime", pattern=self.pattern)
-        raise ValueError  # this shouldn't happen
+    def name(self) -> str:
+        return str(self)
+
+    @property
+    def format(self) -> Format:
+        return Format(locale=self.locale, type=self.type)
+
+    @property
+    def type(self) -> Type:
+        return Type(name="datetime", grain=self.grain)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __hash__(self):
+        return hash(self.id)
 
 
-class BaseTimeDimension(metaclass=TimeDimension):
-    pattern: str = None
-    skeleton: str = None
-
-    def __init__(self):
-        raise ValueError("Time dimensions are singletons, don't instantiate them")
+class Time(GenericTimeDimension):
+    grain = "second"
 
 
-class Time(BaseTimeDimension):
-    period = None
-    skeleton = "yyMMdHmmss"
+class Year(GenericTimeDimension):
+    grain = "year"
 
 
-class Year(BaseTimeDimension):
-    period = "year"
-    pattern = "yy"
+class Quarter(GenericTimeDimension):
+    grain = "quarter"
 
 
-class Quarter(BaseTimeDimension):
-    period = "quarter"
-    pattern = "qqqq yy"
+class Month(GenericTimeDimension):
+    grain = "month"
 
 
-class Month(BaseTimeDimension):
-    period = "month"
-    skeleton = "MMMMy"
+class Week(GenericTimeDimension):
+    grain = "week"
 
 
-class Week(BaseTimeDimension):
-    period = "week"
-    skeleton = "w Y"
-
-
-class Day(BaseTimeDimension):
-    period = "day"
-    skeleton = "yMd"
+class Day(GenericTimeDimension):
+    grain = "day"
 
 
 class Date(Day):
-    period = "day"
+    pass
 
 
-class Hour(BaseTimeDimension):
-    period = "hour"
-    skeleton = "yMd hh"
+class Hour(GenericTimeDimension):
+    grain = "hour"
 
 
-class Minute(BaseTimeDimension):
-    period = "minute"
-    skeleton = "yMd hm"
+class Minute(GenericTimeDimension):
+    grain = "minute"
 
 
-class Second(BaseTimeDimension):
-    period = "second"
-    skeleton = "yMd hms"
+class Second(GenericTimeDimension):
+    grain = "second"
 
 
 dimensions = {

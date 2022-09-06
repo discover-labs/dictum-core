@@ -2,8 +2,9 @@ import pytest
 from lark import Token, Tree
 
 from dictum_core.engine import Column, DisplayInfo
+from dictum_core.format import Format
 from dictum_core.model.scalar import LiteralTransform, ScalarTransform, transforms
-from dictum_core.schema import FormatConfig
+from dictum_core.schema import Type
 
 
 @pytest.fixture(scope="function")
@@ -58,7 +59,7 @@ def test_booleans(col: Column):
     for key in ["eq", "ne", "gt", "ge", "lt", "le"]:
         transform = transforms[key](0)
         result = transform(col)
-        assert result.type == "bool"
+        assert result.type.name == "bool"
         assert result.expr.children[0].data == key
         assert result.expr.children[0].children == [
             Token("INTEGER", "1"),
@@ -68,11 +69,11 @@ def test_booleans(col: Column):
 
 def test_nulls(col: Column):
     result = transforms["isnull"]()(col)
-    assert result.type == "bool"
+    assert result.type.name == "bool"
     assert result.expr == Tree("expr", [Tree("isnull", [Token("INTEGER", "1")])])
 
     result = transforms["isnotnull"]()(col)
-    assert result.type == "bool"
+    assert result.type.name == "bool"
     assert result.expr == Tree(
         "expr", [Tree("NOT", [Tree("isnull", [Token("INTEGER", "1")])])]
     )
@@ -80,7 +81,7 @@ def test_nulls(col: Column):
 
 def test_inrange(col: Column):
     result = transforms["inrange"](-1, 1)(col)
-    assert result.type == "bool"
+    assert result.type.name == "bool"
     assert result.expr == Tree(
         "expr",
         [
@@ -97,7 +98,7 @@ def test_inrange(col: Column):
 
 def test_in(col: Column):
     result = transforms["isin"](0, 1, 2)(col)
-    assert result.type == "bool"
+    assert result.type.name == "bool"
     assert result.expr.children[0] == Tree(
         "IN",
         [
@@ -111,13 +112,13 @@ def test_in(col: Column):
 
 def test_datepart(col: Column):
     result = transforms["datepart"]("month")(col)
-    assert result.type == "int"
+    assert result.type.name == "int"
     assert result.expr.children[0] == Tree(
         "call", ["datepart", "month", col.expr.children[0]]
     )
 
     result = transforms["month"]()(col)
-    assert result.type == "int"
+    assert result.type.name == "int"
     assert result.expr.children[0] == Tree(
         "call", ["datepart", "month", col.expr.children[0]]
     )
@@ -127,16 +128,14 @@ def test_datetrunc(col: Column):
     col.display_info = DisplayInfo(
         display_name="xxx",
         column_name="xxx",
-        format=FormatConfig(kind="date"),
+        format=Format(locale="en", type=Type(name="datetime")),
         kind="dimension",
         altair_time_unit="month",
     )
     datetrunc = transforms["datetrunc"]("month")
     result = datetrunc(col)
-    assert result.type == "datetime"
+    assert result.type.name == "datetime"
+    assert result.type.grain == "month"
     assert result.expr.children[0] == Tree(
         "call", ["datetrunc", "month", col.expr.children[0]]
     )
-
-    assert datetrunc.get_format("datetime").pattern is None
-    assert datetrunc.get_format("datetime").skeleton == "yMMM"

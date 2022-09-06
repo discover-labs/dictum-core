@@ -4,7 +4,7 @@ from pydantic import Field
 
 from dictum_core.schema.id import ID
 from dictum_core.schema.model.format import Formatted
-from dictum_core.schema.model.type import Type
+from dictum_core.schema.model.types import Type
 
 
 class Transform(Formatted):

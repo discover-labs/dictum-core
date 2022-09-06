@@ -1,9 +1,13 @@
-from typing import List, Optional
+from collections import defaultdict
+from typing import Dict, List, Optional
 
 from lark import Transformer, Tree
 
 from dictum_core import engine, schema
+from dictum_core.format import Format
+from dictum_core.model.dicts import TransformDict
 from dictum_core.model.expr import parse_expr
+from dictum_core.schema import Type
 from dictum_core.utils import value_to_token
 
 
@@ -23,10 +27,17 @@ class TransformTransformer(Transformer):
         return children[0]
 
 
-transforms = {}
+class ScalarTransformMeta(type):
+    pass
 
 
-class ScalarTransform:
+transforms = TransformDict()
+transforms_by_input_type: Dict[str, TransformDict] = defaultdict(
+    lambda: TransformDict()
+)
+
+
+class ScalarTransform(metaclass=ScalarTransformMeta):
     """A scalar transform. Column in, Column out. Can change different aspects
     of the column, expression (always), name, format etc.
     """
@@ -34,14 +45,18 @@ class ScalarTransform:
     id: str
     name: str
     description: Optional[str] = None
+
     return_type: Optional[schema.Type] = None
+    input_types: List[str]
 
     def __init__(self, *args):
         self._args = [value_to_token(a) for a in args]
 
     def __init_subclass__(cls):
         if hasattr(cls, "id") and cls.id is not None:
-            transforms[cls.id] = cls
+            transforms.add(cls)
+            for input_type in cls.input_types:
+                transforms_by_input_type[input_type].add(cls)
 
     def get_name(self, name: str) -> str:
         return name
@@ -54,7 +69,7 @@ class ScalarTransform:
             return self.return_type
         return original
 
-    def get_format(self, format: schema.FormatConfig) -> schema.FormatConfig:
+    def get_format(self, format: Format) -> Format:
         return format
 
     def get_display_info(
@@ -69,6 +84,7 @@ class ScalarTransform:
                 else display_info.display_name
             ),
             column_name=display_info.column_name,
+            type=self.get_return_type(display_info.type),
             format=self.get_format(display_info.format),
             keep_display_name=display_info.keep_display_name,
             kind=display_info.kind,
@@ -106,14 +122,18 @@ class LiteralTransform(ScalarTransform):
 
 class InvertTransform(LiteralTransform):
     id = "invert"
-    return_type = "bool"
     expr = "not (@)"
+
+    input_types: List[str] = ["bool"]
+    return_type = Type(name="bool")
 
 
 class BooleanTransform(LiteralTransform):
     args = ["value"]
-    return_type = "bool"
     op: str
+
+    input_types: List[str] = ["datetime", "int", "float", "str"]
+    return_type = Type(name="bool")
 
     def __init_subclass__(cls):
         cls.id = cls.__name__[:2].lower()
@@ -149,29 +169,37 @@ class LeTransform(BooleanTransform):
 class IsNullTransform(LiteralTransform):
     id = "isnull"
     name = "IS NULL"
-    return_type = "bool"
     expr = "@ is null"
+
+    input_types: List[str] = ["str", "bool", "int", "float", "datetime"]
+    return_type = Type(name="bool")
 
 
 class IsNotNullTransform(LiteralTransform):
     id = "isnotnull"
     name = "IS NOT NULL"
-    return_type = "bool"
     expr = "@ is not null"
+
+    input_types: List[str] = ["str", "bool", "int", "float", "datetime"]
+    return_type = Type(name="bool")
 
 
 class InRangeTransform(LiteralTransform):
     id = "inrange"
     name = "in range"
-    return_type = "bool"
     args = ["min", "max"]
     expr = "@ >= min and @ <= max"
+
+    input_types: List[str] = ["int", "float"]
+    return_type = Type(name="bool")
 
 
 class IsInTransform(ScalarTransform):
     id = "isin"
     name = "IN"
-    return_type = "bool"
+
+    input_types: List[str] = ["string", "int"]
+    return_type = Type(name="bool")
 
     def transform_expr(self, expr: Tree) -> Tree:
         return Tree("IN", [expr, *self._args])
@@ -180,9 +208,11 @@ class IsInTransform(ScalarTransform):
 class LastTransform(LiteralTransform):
     id = "last"
     name = "last"
-    return_type = "bool"
     args = ["n", "part"]
     expr = "datediff(part, @, now()) <= n"
+
+    input_types: List[str] = ["datetime"]
+    return_type = Type(name="bool")
 
     def __init__(self, n: int, period: str):
         super().__init__(n, period)
@@ -191,20 +221,28 @@ class LastTransform(LiteralTransform):
 class StepTransform(LiteralTransform):
     id = "step"
     name = "step"
-    return_type = "int"
     args = ["size"]
     expr = "@ // size * size"
+
+    input_types: List[str] = ["float", "int"]
+    return_type = Type(name="int")
 
 
 class DatepartTransform(LiteralTransform):
     id = "datepart"
     name = "date part"
     args = ["part"]
-    return_type = "int"
     expr = "datepart(part, @)"
 
-    def get_format(self, format: schema.FormatConfig) -> schema.FormatConfig:
-        return schema.FormatConfig(kind="decimal", pattern="#")
+    input_types: List[str] = ["datetime"]
+    return_type = Type(name="int")
+
+    def get_format(self, format: Format) -> Format:
+        return Format(
+            locale=format.locale,
+            type=schema.Type(name="int"),
+            config=schema.FormatConfig(kind="decimal", pattern="#"),
+        )
 
     def get_display_name(self, name: str) -> str:
         return f"{name} ({self._args[0]})"
@@ -270,19 +308,12 @@ class DowTransform(DayOfWeekTransform):
     id = "dow"
 
 
-date_skeletons = {
-    "year": "y",
-    "quarter": "yQQQ",
-    "month": "yMMM",
-    "week": "yw",
-    "day": "yMd",
-}
-
-
 class DatetruncTransform(ScalarTransform):
     id = "datetrunc"
     name = "Truncate a date"
-    return_type = "datetime"
+
+    input_types: List[str] = ["datetime"]
+    return_type = Type(name="datetime")
 
     part_to_altair_time_unit = {
         "year": "year",
@@ -297,11 +328,8 @@ class DatetruncTransform(ScalarTransform):
     def __init__(self, period: str):
         super().__init__(period)
 
-    def get_format(self, format: schema.FormatConfig) -> schema.FormatConfig:
-        part = self._args[0]
-        if part in date_skeletons:
-            return schema.FormatConfig(kind="date", skeleton=date_skeletons[part])
-        return schema.FormatConfig(kind="datetime")
+    def get_format(self, format: Format) -> Format:
+        return Format(locale=format.locale, type=self.get_return_type(format.type))
 
     def get_display_info(
         self, display_info: Optional["engine.DisplayInfo"]
@@ -312,6 +340,9 @@ class DatetruncTransform(ScalarTransform):
 
     def transform_expr(self, expr: Tree):
         return Tree("call", ["datetrunc", *self._args, expr])
+
+    def get_return_type(self, original: schema.Type) -> schema.Type:
+        return Type(name="datetime", grain=self._args[0])
 
 
 class DateTransform(DatetruncTransform):

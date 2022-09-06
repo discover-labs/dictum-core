@@ -13,6 +13,7 @@ from dictum_core.engine.operators import (
     RecordsFilterOperator,
 )
 from dictum_core.engine.result import DisplayInfo
+from dictum_core.format import Format
 from dictum_core.model import Metric, Model
 from dictum_core.schema import (
     FormatConfig,
@@ -22,6 +23,7 @@ from dictum_core.schema import (
     QueryMetric,
     QueryMetricRequest,
     QueryTableTransform,
+    Type,
 )
 
 
@@ -410,7 +412,7 @@ class AddPercentMetric(AddTotalMetric):
                 "expr",
                 [Tree("div", [numerator, denominator])],
             ),
-            type="float",
+            type=Type(name="float"),
             display_info=DisplayInfo(
                 display_name=(
                     f"{self.metric.name} (%)"
@@ -418,7 +420,11 @@ class AddPercentMetric(AddTotalMetric):
                     else self.request.alias
                 ),
                 column_name=self.request.name,
-                format=FormatConfig(kind="percent"),
+                format=Format(
+                    locale=self.metric.format.locale,
+                    type=Type(name="float"),
+                    config=FormatConfig(kind="percent"),
+                ),
                 type=self.metric.type,
                 kind="metric",
             ),

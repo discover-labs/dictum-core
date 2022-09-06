@@ -1,3 +1,4 @@
+from dictum_core.schema import Type
 from dictum_core.schema.model.calculations import Calculation
 from dictum_core.schema.model.table import Table
 from dictum_core.schema.model.transform import Transform
@@ -46,14 +47,11 @@ def test_expr_alias():
 
 
 def test_transform_return_type():
-    assert (
-        Transform.parse_obj(
-            {
-                "id": "test",
-                "name": "test",
-                "expr": "test",
-                "return_type": "int",
-            }
-        ).return_type
-        == "int"
-    )
+    assert Transform.parse_obj(
+        {
+            "id": "test",
+            "name": "test",
+            "expr": "test",
+            "return_type": {"name": "int"},
+        }
+    ).return_type == Type(name="int")

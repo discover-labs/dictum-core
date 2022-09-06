@@ -7,8 +7,12 @@ from lark import Transformer, Tree
 
 import dictum_core.model
 from dictum_core import schema
+from dictum_core.format import Format
 from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
+from dictum_core.model.scalar import ScalarTransformMeta, transforms_by_input_type
+from dictum_core.model.time import GenericTimeDimension
+from dictum_core.model.time import dimensions as time_dimensions
 from dictum_core.utils import value_to_token
 
 
@@ -22,12 +26,8 @@ class Displayed:
     name: str
     description: str
     type: schema.Type
-    format: Optional[schema.FormatConfig]
+    format: Optional[Format]
     missing: Optional[Any]
-
-    def __post_init__(self):
-        if isinstance(self.format, dict):
-            self.format = schema.FormatConfig.parse_obj(self.format)
 
 
 @dataclass
@@ -169,6 +169,10 @@ class Dimension(TableCalculation):
             )
             measure.check_references(path)
 
+    @property
+    def transforms(self) -> Dict[str, ScalarTransformMeta]:
+        return transforms_by_input_type[self.type.name]
+
 
 @dataclass
 class TableFilter:
@@ -224,11 +228,11 @@ class MeasureTransformer(Transformer):
 
 @dataclass(repr=False)
 class Measure(TableCalculation):
+    model: "dictum_core.model.Model"
     str_filter: Optional[str] = None
     str_time: Optional[str] = None
 
     def __post_init__(self):
-        super().__post_init__()
         if self.kind != "aggregate":
             raise ValueError(
                 f"Measures must be aggregate, {self} expression is not: {self.str_expr}"
@@ -254,17 +258,19 @@ class Measure(TableCalculation):
 
     @property
     def time(self) -> Dimension:
-        if self.str_time is None:
-            raise ValueError(
-                f"{self} doesn't have a time dimension specified so it "
-                "can't be used with the built-in Time dimension"
-            )
-
-        return self.table.allowed_dimensions[self.str_time]
+        if self.str_time is not None:  # explicit time
+            return self.table.allowed_dimensions[self.str_time]
 
     @cached_property
-    def dimensions(self):
-        return self.table.allowed_dimensions.values()
+    def dimensions(self) -> Dict[str, Dimension]:
+        result = self.table.allowed_dimensions.copy()
+        if self.str_time is not None:
+            allowed_grains = set(self.time.type.grains)
+            for TimeDimension in time_dimensions.values():
+                if TimeDimension.grain in allowed_grains or TimeDimension.id == "Time":
+                    dimension = TimeDimension(locale=self.model.locale)
+                    result[dimension.id] = dimension
+        return result
 
     def check_measure_references(self, path=tuple()):
         for ref in self.parsed_expr.find_data("measure"):
@@ -367,10 +373,24 @@ class Metric(Calculation):
         return result
 
     @cached_property
-    def dimensions(self) -> Dict[str, Dimension]:
+    def dimensions(self) -> List[Dimension]:
         return sorted(
-            set.intersection(*(set(m.dimensions) for m in self.measures)),
+            set.intersection(
+                *(set(d for d in m.dimensions.values()) for m in self.measures)
+            ),
             key=lambda x: x.name,
+        )
+
+    @cached_property
+    def generic_time_dimensions(self) -> List[GenericTimeDimension]:
+        """Return a list of generic time dimensions available for this metric. All of
+        them are available if generic time is defined for all measures used here.
+        """
+        return list(
+            sorted(
+                (d for d in self.dimensions if isinstance(d, GenericTimeDimension)),
+                key=lambda x: x.sort_order,
+            )
         )
 
     @cached_property

@@ -1,5 +1,6 @@
 import shutil
 from pathlib import Path
+from typing import Optional
 
 import typer
 import yaml
@@ -7,7 +8,9 @@ from jinja2 import Template
 from rich.console import Console
 from rich.prompt import IntPrompt, Prompt
 
+from dictum_core import Project
 from dictum_core.backends.base import Backend
+from dictum_core.schema.catalog import Catalog, CatalogMetric
 
 app = typer.Typer()
 console = Console()
@@ -79,3 +82,22 @@ def version():
     from dictum_core import __version__
 
     typer.echo(f"Dictum {__version__}")
+
+
+@app.command()
+def catalog(
+    path: Optional[Path] = typer.Argument(default=None), output: Optional[Path] = None
+):
+    project = Project(path=path)
+    metrics = [CatalogMetric.from_orm(m) for m in project.model.metrics.values()]
+    catalog = Catalog(
+        name=project.model.name, description=project.model.description, metrics=metrics
+    )
+    json = catalog.json()
+    if output is None:
+        import sys
+
+        sys.stdout.write(json)
+        return
+
+    output.write_text(json)

@@ -7,7 +7,7 @@ from dictum_core.engine.computation import Column, RelationalQuery
 from dictum_core.engine.result import DisplayInfo
 from dictum_core.model import DimensionsUnion, Measure, Model
 from dictum_core.model.scalar import DatetruncTransform
-from dictum_core.model.time import TimeDimension
+from dictum_core.model.time import GenericTimeDimension
 from dictum_core.schema import QueryDimension, QueryDimensionRequest
 
 
@@ -31,7 +31,7 @@ class AggregateQueryBuilder:
         a given measure's anchor table.
         """
         anchor = measure.table
-        dimension = self.model.dimensions.get(request.dimension.id)
+        dimension = measure.dimensions.get(request.dimension.id)
 
         # if union, replace dimension with it
         if isinstance(dimension, DimensionsUnion):
@@ -49,14 +49,14 @@ class AggregateQueryBuilder:
 
         # if generic time, prepend transforms with datetrunc
         # and replace the dimension with measure's time
-        if isinstance(dimension, TimeDimension):
-            if dimension.period is not None:
-                transforms = [DatetruncTransform(dimension.period), *transforms]
-                if measure.time is None:
-                    raise ValueError(
-                        f"You requested a generic Time dimension with {measure}, "
-                        "but it doesn't have a time dimension specified"
-                    )
+        if isinstance(dimension, GenericTimeDimension):
+            if measure.time is None:
+                raise ValueError(
+                    f"You requested a generic {dimension} dimension with {measure}, "
+                    "but it doesn't have a time dimension specified"
+                )
+            if dimension.grain is not None:
+                transforms = [DatetruncTransform(dimension.type.grain), *transforms]
             display_name = dimension.name if request.alias is None else request.alias
             dimension = measure.time
 
@@ -77,6 +77,7 @@ class AggregateQueryBuilder:
             display_info=DisplayInfo(
                 display_name=display_name,
                 column_name=request.name,
+                type=dimension.type,
                 format=dimension.format,
                 kind="dimension",
                 keep_display_name=(request.alias is not None),
