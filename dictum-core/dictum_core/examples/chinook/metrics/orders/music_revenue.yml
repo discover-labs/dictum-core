@@ -6,4 +6,4 @@ expr: $revenue
 table: invoice_items
 filter: track.MediaTypeId in (1, 2, 4, 5)
 format: currency
-time: sale_date
+time: invoice_date

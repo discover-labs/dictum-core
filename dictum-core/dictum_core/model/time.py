@@ -6,11 +6,15 @@ class GenericTimeDimension:
     type: Type
     grain: str
 
+    _sort_counter = 0
+
     def __init__(self, locale: str):
         self.locale = locale
 
     def __init_subclass__(cls):
         cls.id = cls.__name__
+        cls.sort_order = GenericTimeDimension._sort_counter
+        GenericTimeDimension._sort_counter += 1
 
     def __str__(self):
         return self.__class__.__name__
@@ -29,6 +33,12 @@ class GenericTimeDimension:
     @property
     def type(self) -> Type:
         return Type(name="datetime", grain=self.grain)
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __hash__(self):
+        return hash(self.id)
 
 
 class Time(GenericTimeDimension):
@@ -56,7 +66,7 @@ class Day(GenericTimeDimension):
 
 
 class Date(Day):
-    grain = "day"
+    pass
 
 
 class Hour(GenericTimeDimension):

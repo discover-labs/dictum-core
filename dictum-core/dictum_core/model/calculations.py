@@ -12,6 +12,7 @@ from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
 from dictum_core.model.scalar import ScalarTransformMeta, transforms_by_input_type
 from dictum_core.model.time import GenericTimeDimension
+from dictum_core.model.time import dimensions as time_dimensions
 from dictum_core.utils import value_to_token
 
 
@@ -227,6 +228,7 @@ class MeasureTransformer(Transformer):
 
 @dataclass(repr=False)
 class Measure(TableCalculation):
+    model: "dictum_core.model.Model"
     str_filter: Optional[str] = None
     str_time: Optional[str] = None
 
@@ -259,14 +261,16 @@ class Measure(TableCalculation):
         if self.str_time is not None:  # explicit time
             return self.table.allowed_dimensions[self.str_time]
 
-        raise ValueError(
-            f"{self} doesn't have a time dimension specified so it "
-            "can't be used with the built-in Time dimension"
-        )
-
     @cached_property
-    def dimensions(self):
-        return self.table.allowed_dimensions.values()
+    def dimensions(self) -> Dict[str, Dimension]:
+        result = self.table.allowed_dimensions.copy()
+        if self.str_time is not None:
+            allowed_grains = set(self.time.type.grains)
+            for TimeDimension in time_dimensions.values():
+                if TimeDimension.grain in allowed_grains or TimeDimension.id == "Time":
+                    dimension = TimeDimension(locale=self.model.locale)
+                    result[dimension.id] = dimension
+        return result
 
     def check_measure_references(self, path=tuple()):
         for ref in self.parsed_expr.find_data("measure"):
@@ -371,7 +375,9 @@ class Metric(Calculation):
     @cached_property
     def dimensions(self) -> List[Dimension]:
         return sorted(
-            set.intersection(*(set(d for d in m.dimensions) for m in self.measures)),
+            set.intersection(
+                *(set(d for d in m.dimensions.values()) for m in self.measures)
+            ),
             key=lambda x: x.name,
         )
 
@@ -379,16 +385,13 @@ class Metric(Calculation):
     def generic_time_dimensions(self) -> List[GenericTimeDimension]:
         """Return a list of generic time dimensions available for this metric. All of
         them are available if generic time is defined for all measures used here.
-
-        TODO: when aggregations are available, make this grain-aware
         """
-        if all(measure.str_time is not None for measure in self.measures):
-            return list(
-                d
-                for d in self.model.dimensions.values()
-                if isinstance(d, GenericTimeDimension)
+        return list(
+            sorted(
+                (d for d in self.dimensions if isinstance(d, GenericTimeDimension)),
+                key=lambda x: x.sort_order,
             )
-        return []
+        )
 
     @cached_property
     def lineage(self) -> List[dict]:

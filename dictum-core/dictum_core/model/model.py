@@ -92,6 +92,7 @@ class Model:
 
     def add_measure(self, measure: schema.Measure, table: Table) -> Measure:
         result = Measure(
+            model=self,
             table=table,
             type=measure.type,
             format=Format(type=measure.type, config=measure.format, locale=self.locale),

@@ -25,6 +25,7 @@ class CatalogCalculation(BaseModel):
     description: Optional[str]
     expr: Optional[str] = Field(alias="str_expr")
     format: CatalogFormat
+    type: CatalogType
 
     class Config:
         orm_mode = True

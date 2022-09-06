@@ -31,7 +31,7 @@ class AggregateQueryBuilder:
         a given measure's anchor table.
         """
         anchor = measure.table
-        dimension = self.model.dimensions.get(request.dimension.id)
+        dimension = measure.dimensions.get(request.dimension.id)
 
         # if union, replace dimension with it
         if isinstance(dimension, DimensionsUnion):
@@ -50,13 +50,13 @@ class AggregateQueryBuilder:
         # if generic time, prepend transforms with datetrunc
         # and replace the dimension with measure's time
         if isinstance(dimension, GenericTimeDimension):
+            if measure.time is None:
+                raise ValueError(
+                    f"You requested a generic {dimension} dimension with {measure}, "
+                    "but it doesn't have a time dimension specified"
+                )
             if dimension.grain is not None:
                 transforms = [DatetruncTransform(dimension.type.grain), *transforms]
-                if measure.time is None:
-                    raise ValueError(
-                        f"You requested a generic Time dimension with {measure}, "
-                        "but it doesn't have a time dimension specified"
-                    )
             display_name = dimension.name if request.alias is None else request.alias
             dimension = measure.time
 

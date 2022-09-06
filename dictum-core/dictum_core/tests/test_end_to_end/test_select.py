@@ -532,10 +532,6 @@ def test_generic_time_format(project: Project):
         ("Week", 202),
         ("Day", 354),
         ("Date", 354),
-        ("Hour", 354),  # dates in the database
-        ("Minute", 354),
-        ("Second", 354),
-        ("Time", 354),
     ],
 )
 def test_generic_time_trunc(project: Project, dimension: str, n: int):
