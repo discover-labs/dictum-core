@@ -1,5 +1,5 @@
 from datetime import datetime
-from functools import cache, cached_property
+from functools import cached_property, lru_cache
 from numbers import Number
 from typing import Any, Optional
 
@@ -17,6 +17,8 @@ grain_skeletons = {
     "week": "yw",
     "day": "yMd",
 }
+
+cache = lru_cache(maxsize=None)
 
 
 @cache
