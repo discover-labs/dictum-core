@@ -1,9 +1,9 @@
 from pathlib import Path
-import yaml
-from dictum_core import Project
 
+import yaml
 from typer.testing import CliRunner
 
+from dictum_core import Project
 from dictum_core.cli import app
 
 runner = CliRunner()

@@ -1,5 +1,5 @@
-from pathlib import Path
 import json
+from pathlib import Path
 
 from jinja2.environment import Environment
 from jinja2.loaders import FileSystemLoader

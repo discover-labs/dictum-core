@@ -1,15 +1,15 @@
-from copy import deepcopy
 from functools import wraps
 from typing import Optional
+
+from lark import Token, Tree
 
 import dictum_core.interactive_model.table
 from dictum_core import model
 from dictum_core.interactive_model.model import InteractiveModel
 from dictum_core.interactive_model.resolve import resolve_interactive_expression
 from dictum_core.model.expr import parse_expr
-from dictum_core.model.expr.introspection import ExprKind, get_expr_kind
+from dictum_core.model.expr.introspection import get_expr_kind
 from dictum_core.schema.model.types import resolve_type
-from lark import Token, Tree
 
 
 def handle_literals(fn):

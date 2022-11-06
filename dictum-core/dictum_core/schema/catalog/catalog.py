@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel
+
 from dictum_core.schema.catalog.calculations import CatalogMetric
 
 

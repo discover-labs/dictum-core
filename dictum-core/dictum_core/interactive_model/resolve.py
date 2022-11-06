@@ -1,4 +1,3 @@
-import dictum_core.interactive_model.expression
 from lark import Transformer
 
 

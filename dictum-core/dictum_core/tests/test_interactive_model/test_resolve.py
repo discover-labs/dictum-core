@@ -1,8 +1,9 @@
 import pytest
+from lark import Tree
+
 from dictum_core.interactive_model.resolve import resolve_interactive_expression
 from dictum_core.interactive_model.table import InteractiveTable
 from dictum_core.model.expr.parser import parse_expr
-from lark import Tree
 
 
 @pytest.fixture(scope="module")

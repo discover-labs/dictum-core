@@ -1,6 +1,8 @@
-from typing import List, Optional
 import sys
+from typing import List, Optional
+
 from packaging import version
+
 from dictum_core import __version__
 
 

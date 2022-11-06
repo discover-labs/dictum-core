@@ -1,4 +1,5 @@
 import pytest
+
 from dictum_core.interactive_model.model import InteractiveModel
 from dictum_core.interactive_model.table import InteractiveTable
 

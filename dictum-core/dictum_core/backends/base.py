@@ -1,8 +1,8 @@
 import inspect
-from collections import UserDict
-from functools import cached_property
 from abc import ABC, abstractmethod
+from collections import UserDict
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Any, Dict, List, Optional
 
 import pkg_resources

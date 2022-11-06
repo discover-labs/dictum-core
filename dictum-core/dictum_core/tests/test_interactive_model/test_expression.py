@@ -1,11 +1,12 @@
 import pytest
+from lark import Token, Tree
+
 from dictum_core.interactive_model.expression import (
     InteractiveExpression,
     handle_literals,
     op_list,
     op_map,
 )
-from lark import Token, Tree
 
 
 @pytest.fixture(scope="module")

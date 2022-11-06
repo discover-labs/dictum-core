@@ -1,10 +1,7 @@
 from typing import List, Optional, Tuple, Union
 
 from dictum_core import model
-from dictum_core.interactive_model.expression import (
-    InteractiveColumn,
-    InteractiveExpression,
-)
+from dictum_core.interactive_model.expression import InteractiveColumn
 from dictum_core.interactive_model.model import InteractiveModel
 
 
