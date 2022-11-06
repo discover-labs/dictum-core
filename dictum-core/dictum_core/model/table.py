@@ -1,7 +1,7 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from lark import Tree
 
@@ -12,8 +12,8 @@ from dictum_core.model.dicts import DimensionDict, MeasureDict
 @dataclass
 class RelatedTable:
     str_table: str
-    foreign_key: str
     str_related_key: str
+    foreign_key: str
     alias: str
 
     parent: "Table"
@@ -62,7 +62,7 @@ class Table:
     """Represents a relational data table"""
 
     id: str
-    source: str
+    source: Union[str, Dict[str, str]]
     description: Optional[str] = None
     primary_key: Optional[str] = None
     filters: List[TableFilter] = field(default_factory=list)
@@ -72,6 +72,18 @@ class Table:
     measure_backlinks: Dict[str, "Table"] = field(
         default_factory=dict
     )  # measure_id -> table
+
+    def add_related(
+        self, str_table: str, related_key: str, foreign_key: str, alias: str, tables
+    ):
+        self.related[alias] = RelatedTable(
+            str_table=str_table,
+            str_related_key=related_key,
+            foreign_key=foreign_key,
+            alias=alias,
+            parent=self,
+            tables=tables,
+        )
 
     def find_all_paths(
         self, traversed_tables: Tuple[str] = ()

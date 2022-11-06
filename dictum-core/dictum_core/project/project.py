@@ -55,7 +55,7 @@ class Project:
 
     @cached_property
     def model(self) -> Model:
-        return Model(self._project.get_model())
+        return Model.from_config(self._project.get_model())
 
     @cached_property
     def engine(self) -> Engine:

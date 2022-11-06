@@ -29,7 +29,7 @@ def project(backend):
 @pytest.fixture(scope="session")
 def chinook():
     os.environ["CHINOOK_DATABASE"] = ""
-    return Model(schema.Project.load(chinook_path).get_model())
+    return Model.from_config(schema.Project.load(chinook_path).get_model())
 
 
 @pytest.fixture(scope="session")

@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from dictum_core import schema
 from dictum_core.format import Format
@@ -13,8 +13,9 @@ from dictum_core.model.calculations import (
 )
 from dictum_core.model.dicts import DimensionDict, MeasureDict, MetricDict
 from dictum_core.model.scalar import transforms as scalar_transforms
-from dictum_core.model.table import RelatedTable, Table, TableFilter
+from dictum_core.model.table import Table, TableFilter
 from dictum_core.model.time import dimensions as time_dimensions
+from dictum_core.schema.model.types import Type
 
 displayed_fields = {"id", "name", "description", "missing"}
 
@@ -22,107 +23,178 @@ table_calc_fields = displayed_fields | {"str_expr"}
 
 
 class Model:
-    def __init__(self, model: schema.Model):
-        self.name = model.name
-        self.description = model.description
-        self.locale = model.locale
+    def __init__(self, name: Optional[str] = None) -> None:
+        self.name = name
+        self.description = None
+        self.locale = "en_US"
+        self.scalar_transforms = scalar_transforms
+        self.theme = None
 
         self.tables: Dict[str, Table] = {}
         self.measures = MeasureDict()
         self.dimensions = DimensionDict()
         self.metrics = MetricDict()
-        self.scalar_transforms = scalar_transforms
 
-        self.theme = model.theme
+    @classmethod
+    def from_config(cls, model: schema.Model):
+        obj = cls(name=model.name)
+        obj.description = model.description
+        obj.locale = model.locale
+        obj.theme = model.theme
 
         # add unions
         for union in model.unions.values():
-            self.dimensions[union.id] = DimensionsUnion(
+            obj.dimensions[union.id] = DimensionsUnion(
                 **union.dict(include=displayed_fields),
-                format=Format(type=union.type, config=union.format, locale=self.locale),
+                format=Format(type=union.type, config=union.format, locale=obj.locale),
                 type=union.type,
             )
 
         # add all tables, their relationships and calculations
         for config_table in model.tables.values():
-            table = self.create_table(config_table)
-            self.tables[table.id] = table
+            table = obj.add_table(
+                **config_table.dict(
+                    include={"id", "source", "description", "primary_key", "filters"}
+                )
+            )
+
+            for related in config_table.related.values():
+                table.add_related(
+                    str_table=related.str_table,
+                    related_key=related.str_related_key,
+                    foreign_key=related.foreign_key,
+                    alias=related.alias,
+                    tables=obj.tables,
+                )
 
             # add table dimensions
             for dimension in config_table.dimensions.values():
-                self.add_dimension(dimension, table)
+                obj.add_dimension(
+                    table=table,
+                    format_config=dimension.format,
+                    type=dimension.type,
+                    **dimension.dict(include=table_calc_fields | {"union"}),
+                )
 
             # add table measures
             for measure in config_table.measures.values():
-                self.add_measure(measure, table)
+                obj.add_measure(
+                    table=table,
+                    format_config=measure.format,
+                    type=measure.type,
+                    **measure.dict(
+                        include=table_calc_fields | {"str_filter", "str_time"}
+                    ),
+                )
 
         # add detached dimensions
-        for dimension in model.dimensions.values():
-            table = self.tables[dimension.table]
-            self.add_dimension(dimension, table)
+        # for dimension in model.dimensions.values():
+        #     table = obj.tables[dimension.table]
+        #     obj.add_dimension(dimension, table)
 
         # add metrics
         for metric in model.metrics.values():
-            self.add_metric(metric)
+            obj.add_metric(
+                type=metric.type,
+                format_config=metric.format,
+                **metric.dict(
+                    include=table_calc_fields | {"str_filter", "str_time", "table"}
+                ),
+            )
 
         # add measure backlinks
-        for table in self.tables.values():
+        for table in obj.tables.values():
             for measure in table.measures.values():
                 for target in table.allowed_join_paths:
                     target.measure_backlinks[measure.id] = table
 
         # add default time dimensions
         for id, time_dimension in time_dimensions.items():
-            self.dimensions[id] = time_dimension(locale=self.locale)
+            obj.dimensions[id] = time_dimension(locale=obj.locale)
 
-    def create_table(self, table: schema.Table):
+        return obj
+
+    def add_table(
+        self,
+        id: str,
+        source: Union[str, Dict[str, str]],
+        description: Optional[str] = None,
+        primary_key: Optional[str] = None,
+        filters: Optional[List[str]] = None,
+    ) -> Table:
         result = Table(
-            **table.dict(include={"id", "source", "description", "primary_key"})
+            id=id, source=source, description=description, primary_key=primary_key
         )
-        for related in table.related.values():
-            result.related[related.alias] = RelatedTable(
-                parent=result,
-                tables=self.tables,
-                **related.dict(
-                    include={"str_table", "str_related_key", "foreign_key", "alias"}
-                ),
-            )
-        result.filters = [TableFilter(str_expr=f, table=result) for f in table.filters]
+        self.tables[result.id] = result
+        if filters:
+            result.filters = [TableFilter(str_expr=f, table=result) for f in filters]
         return result
 
-    def add_measure(self, measure: schema.Measure, table: Table) -> Measure:
+    def add_measure(
+        self,
+        table: Table,
+        id: str,
+        name: str,
+        str_expr: str,
+        description: Optional[str] = None,
+        type: Optional[Type] = None,
+        missing: Optional[Any] = None,
+        format_config: Optional[schema.FormatConfig] = None,
+        str_filter: Optional[str] = None,
+        str_time: Optional[str] = None,
+        metric: Optional[bool] = True,
+    ) -> Measure:
+        if type is None:
+            type = Type(name="float")
         result = Measure(
             model=self,
             table=table,
-            type=measure.type,
-            format=Format(type=measure.type, config=measure.format, locale=self.locale),
-            **measure.dict(include=table_calc_fields | {"str_filter", "str_time"}),
+            id=id,
+            name=name,
+            description=description,
+            type=type,
+            missing=missing,
+            str_expr=str_expr,
+            str_filter=str_filter,
+            str_time=str_time,
+            format=Format(type=type, config=format_config, locale=self.locale),
         )
-        if measure.metric:
+        if metric:
             self.metrics.add(Metric.from_measure(result, self))
         table.measures.add(result)
         self.measures.add(result)
+        return result
 
-    def add_dimension(self, dimension: schema.Dimension, table: Table) -> Dimension:
+    def add_dimension(
+        self,
+        table: Table,
+        id: str,
+        name: str,
+        str_expr: str,
+        type: Type,
+        description: Optional[str] = None,
+        missing: Optional[Any] = None,
+        format_config: Optional[schema.FormatConfig] = None,
+        union: Optional[str] = None,
+    ) -> Dimension:
         result = Dimension(
             table=table,
-            type=dimension.type,
-            format=Format(
-                locale=self.locale,
-                type=dimension.type,
-                config=dimension.format,
-            ),
-            **dimension.dict(include=table_calc_fields),
+            id=id,
+            name=name,
+            str_expr=str_expr,
+            description=description,
+            missing=missing,
+            type=type,
+            format=Format(type=type, config=format_config, locale=self.locale),
         )
         table.dimensions[result.id] = result
-        if dimension.union is not None:
-            if dimension.union in table.dimensions:
+        if union is not None:
+            if union in table.dimensions:
                 raise KeyError(
-                    f"Duplicate union dimension {dimension.union} "
-                    f"on table {table.id}"
+                    f"Duplicate union dimension {union} " f"on table {table.id}"
                 )
-            union = self.dimensions.get(dimension.union)
-            table.dimensions[dimension.union] = dataclasses.replace(
+            union: DimensionsUnion = self.dimensions.get(union)
+            table.dimensions[union.id] = dataclasses.replace(
                 result,
                 id=union.id,
                 name=union.name,
@@ -133,24 +205,50 @@ class Model:
                 is_union=True,
             )
         self.dimensions.add(result)
+        return result
 
-    def add_metric(self, metric: schema.Metric):
-        if metric.table is not None:
+    def add_metric(
+        self,
+        id: str,
+        name: str,
+        str_expr: str,
+        description: Optional[str] = None,
+        missing: Optional[Any] = None,
+        type: Optional[Type] = None,
+        format_config: Optional[schema.FormatConfig] = None,
+        str_filter: Optional[str] = None,
+        str_time: Optional[str] = None,
+        table: Optional[str] = None,
+    ):
+        if table is not None:
             # table is specified, treat as that table's measure
-            table = self.tables.get(metric.table)
-            measure = schema.Measure(
-                **metric.dict(by_alias=True),
+            return self.add_measure(
+                table=self.tables.get(table),
+                id=id,
+                name=name,
+                str_expr=str_expr,
+                description=description,
+                missing=missing,
+                type=type,
+                format_config=format_config,
+                str_time=str_time,
+                str_filter=str_filter,
                 metric=True,
             )
-            return self.add_measure(measure, table)
 
         # no, it's a real metric
-        self.metrics[metric.id] = Metric(
+        result = Metric(
             model=self,
-            type=metric.type,
-            format=Format(locale=self.locale, type=metric.type, config=metric.format),
-            **metric.dict(include=table_calc_fields),
+            id=id,
+            name=name,
+            str_expr=str_expr,
+            description=description,
+            missing=missing,
+            type=type,
+            format=Format(locale=self.locale, type=type, config=format_config),
         )
+        self.metrics[result.id] = result
+        return result
 
     def get_lineage(
         self, calculation: Calculation, parent: Optional[str] = None
