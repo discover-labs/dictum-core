@@ -19,35 +19,35 @@ from dictum_core.schema import Query
 
 
 class Project:
-    def __init__(
-        self,
-        path: Optional[Union[str, Path]] = None,
-        profile: Optional[str] = None,
-    ):
-        """
-        Arguments:
-            path: Path to either the model YAML file or the
-                project directory. If a directory, model config is expected to be in
-                ``project.yml`` file. Defaults to current working directory.
-            profile: Profile name from ``profiles.yml`` to be used. Defaults to the
-                default specified in the config.
-        """
+    def __init__(self, model: Model, backend: Backend):
+        self.model = model
+        self.backend = backend
+        self.engine = Engine(model)
+        self.metrics = ProjectMetrics(self)
+        self.dimensions = ProjectDimensions(self)
+        self.m, self.d = self.metrics, self.dimensions
 
+        if self.model.theme is not None:
+            alt.themes.register("dictum_theme", lambda: self.model.theme)
+            alt.themes.enable("dictum_theme")
+
+    @classmethod
+    def from_path(
+        cls, path: Optional[Union[str, Path]] = None, profile: Optional[str] = None
+    ) -> "Project":
         if path is None:
             path = Path.cwd()
         if isinstance(path, str):
             path = Path(path)
         if not path.exists():
             raise FileNotFoundError(f"Path {path} does not exist")
-        self.path = path
-        self.profile = profile
-        self.m = ProjectMetrics(self)
-        self.metrics = self.m
-        self.d = ProjectDimensions(self)
-        self.dimensions = self.d
-        if self.model.theme is not None:
-            alt.themes.register("dictum_theme", lambda: self.model.theme)
-            alt.themes.enable("dictum_theme")
+
+        project_config = schema.Project.load(path)
+        model = Model.from_config(project_config.get_model())
+        profile = project_config.get_profile(profile)
+        backend = Backend.create(profile.type, profile.parameters)
+
+        return cls(model, backend)
 
     @cached_property
     def _project(self) -> schema.Project:

@@ -3,9 +3,6 @@ from typing import Optional
 
 from lark import Token, Tree
 
-import dictum_core.interactive_model.table
-from dictum_core import model
-from dictum_core.interactive_model.model import InteractiveModel
 from dictum_core.interactive_model.resolve import resolve_interactive_expression
 from dictum_core.model.expr import parse_expr
 from dictum_core.model.expr.introspection import get_expr_kind
@@ -110,48 +107,32 @@ class AbstractInteractiveExpression(Tree, metaclass=InteractiveExpressionMeta):
     def __get__(self, obj, objtype=None):
         return self
 
-    def __set_name__(self, owner: InteractiveModel, name: str):
+    def __ror__(self, table):
+        """An operator for defining a table for table calculations.
+
+        invoices = Table()
+        invoice_items = Table()
+        invoice_items.InvoiceId >> invoices.InvoiceId
+
+        unique_customers = invoice_items | invoices.CustomerId.countd()
+        """
+        for ref in self.find_data("interactive_column"):
+            name, *tables, col = ref.children
+            ref.children = [name, table, *tables, col]
+        return self
+
+    def __set_name__(self, owner, name: str):
         """When the interactive model is built, we need to create all the calculations
         in the actual model.
         - Figure out calculation type (measure/metric/dimension)
         - Create calculation on the actual model
         """
-        try:
-            # resolve self as an unnamed expression to avoid having just a ref to self
-            # in the result
-            str_expr = resolve_interactive_expression(self)
-        except ValueError as e:
-            raise ValueError(f"Error resolving {name}: {e}")
-
         self.children[0] = name  # set name for the resolvers of dependant expressions
 
-        table = None
-        kind = self.get_kind(str_expr)
-        if kind in {"measure", "dimension"}:
-            table: model.Table = (
-                next(self.find_data("interactive_column"))
-                .children[1]
-                ._InteractiveTable__table
-            )
-
-        if kind == "dimension":
-            if self.type_ is None:
-                raise ValueError(f"Missing type for dimension {name}")
-            return owner._model.add_dimension(
-                table=table, id=name, name=name, str_expr=str_expr, type=self.type_
-            )
-
-        if self.kind == "measure":
-            return owner._model.add_measure(
-                table=table,
-                id=name,
-                name=name,
-                str_expr=str_expr,
-                type=self.type_,
-                metric=True,
-            )
-
-        return owner._model.add_metric(id=name, name=name, str_expr=str_expr, type=type)
+    def get_str_expr(self) -> str:
+        return resolve_interactive_expression(
+            AbstractInteractiveExpression(self.data, self.children[1:])
+        )
 
 
 class InteractiveExpression(AbstractInteractiveExpression):
@@ -160,9 +141,7 @@ class InteractiveExpression(AbstractInteractiveExpression):
 
 
 class InteractiveColumn(AbstractInteractiveExpression):
-    def __init__(
-        self, table: "dictum_core.interactive_model.table.InteractiveTable", column: str
-    ):
+    def __init__(self, table, column: str):
         super().__init__("interactive_column", [table, column])
 
     def __rshift__(self, other: "InteractiveColumn"):

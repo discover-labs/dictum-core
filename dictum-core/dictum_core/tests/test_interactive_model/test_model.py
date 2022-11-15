@@ -35,3 +35,7 @@ def test_foreign_key(Model):
 
 def test_set_name(Model):
     assert Model.a.children[0] == "a"
+
+
+def test_specify_table(Model):
+    assert "d" in Model._model.tables["other"].measures

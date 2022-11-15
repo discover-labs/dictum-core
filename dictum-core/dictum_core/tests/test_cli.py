@@ -23,4 +23,4 @@ def test_new(tmp_path: Path):
     assert (test / "metrics").exists() and (test / "metrics").is_dir()
     assert (test / "tables").exists() and (test / "tables").is_dir()
 
-    Project(test)  # generated project is at least valid
+    Project.from_path(test)  # generated project is at least valid

@@ -7,8 +7,21 @@ class ExpressionResolver(Transformer):
     """
 
     def interactive_column(self, children: list):
-        *_, column = children
-        return column
+        _, *tables, column = children
+        if len(tables) == 1:
+            return column
+
+        source, target = tables
+        source_id = source._InteractiveTable__id
+        target_id = target._InteractiveTable__id
+        path = source._InteractiveTable__table.allowed_join_paths.get(
+            target._InteractiveTable__table
+        )
+        if path is None:
+            raise ValueError(
+                f"There is no join path from table {source_id} to {target_id}"
+            )
+        return ".".join([*path, column])
 
     def expr(self, children: list):
         name, expression = children

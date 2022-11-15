@@ -17,4 +17,6 @@ def Model():
         b = other.x.countd()
         c = a / b
 
+        d = other | tbl.value.sum()
+
     return Model

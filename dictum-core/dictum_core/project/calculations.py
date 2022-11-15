@@ -99,6 +99,10 @@ class ProjectMetricRequest(ProjectCalculation):
     def __call__(self, *args, of=None, within=None):
         of = [] if of is None else of
         within = [] if within is None else within
+        if isinstance(of, ProjectDimensionRequest):
+            of = [of]
+        if isinstance(within, ProjectDimensionRequest):
+            within = [within]
         self.request.metric.transforms[-1].args = list(args)
         self.request.metric.transforms[-1].of = [i.request for i in of]
         self.request.metric.transforms[-1].within = [i.request for i in within]
