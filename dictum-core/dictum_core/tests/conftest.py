@@ -3,9 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dictum_core import schema
 from dictum_core.examples import chinook
-from dictum_core.model import Model
 
 chinook_path = Path(chinook.__file__).parent
 

@@ -10,7 +10,7 @@ from dictum_core import schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
 from dictum_core.model import Model
-from dictum_core.project import analyses
+from dictum_core.project import actions, analyses
 from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
 from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
@@ -33,8 +33,6 @@ def _get_calculation_kwargs(definition: str) -> dict:
     result = {}
     tree = parse_shorthand_calculation(definition)
 
-    result["id"] = next(tree.find_data("id")).children[0]
-
     expr = next(tree.find_data("expr"))
     result["expr"] = _get_subtree_str(definition, expr)
 
@@ -42,11 +40,13 @@ def _get_calculation_kwargs(definition: str) -> dict:
         result["table"] = ref.children[0]
     for ref in tree.find_data("type"):
         result["type"] = ref.children[0]
-    result["name"] = result["id"]
+    id_ = next(tree.find_data("id")).children[0]
+    result["name"] = id_.replace("_", " ").title()
+
     for ref in tree.find_data("alias"):
         result["name"] = ref.children[0]
 
-    return result
+    return id_, result
 
 
 def _update_nested(d: dict, u: dict):
@@ -63,12 +63,15 @@ class Project:
         self,
         model_data: YAMLMappedDict,
         backend: Backend,
+        project_config: Optional[schema.Project] = None,
     ):
+        self.project_config = project_config
+        self.backend = backend
+
         self.model_data = model_data
         model_config = schema.Model.parse_obj(model_data)
 
         self.model = Model.from_config(model_config)
-        self.backend = backend
 
         self.engine = Engine(self.model)
         self.metrics = ProjectMetrics(self)
@@ -85,17 +88,25 @@ class Project:
     def new(
         cls,
         backend: Backend,
+        path: Optional[Path] = None,
         name: str = "Untitled",
         locale: str = "en_US",
         currency: str = "USD",
-        path: Optional[Path] = None,
     ):
         """Create a new project with an empty model. Useful for experimenting
-        in Jupyter.
+        in Jupyter. If path is provided, creates a new project at that path.
         """
+        if path is not None:
+            if path.exists() and path.is_dir() and (path / "project.yml").exists():
+                print(f"Project already exists, loading project from {path}")
+                return Project.from_path(path)
+            actions.create_new_project(
+                path=path, backend=backend, name=name, currency=currency, locale=locale
+            )
+            print(f"Created a new project at {path}")
+            return Project.from_path(path=path)
         model_data = schema.Model(name=name, locale=locale, currency=currency).dict()
-        if path is None:
-            return cls(model_data=model_data, backend=backend)
+        model_data = YAMLMappedDict(model_data)
         return cls(model_data=model_data, backend=backend)
 
     @classmethod
@@ -126,11 +137,12 @@ class Project:
             path / project_config.unions_path
         )
 
-        model_config = schema.Model.parse_obj(model_data)
         profile = project_config.get_profile(profile)
         backend = Backend.create(profile.type, profile.parameters)
 
-        return cls(model_config, backend)
+        return cls(
+            model_data=model_data, backend=backend, project_config=project_config
+        )
 
     def execute(self, query: Query) -> Result:
         computation = self.engine.get_computation(query)
@@ -230,6 +242,15 @@ class Project:
         if not source:
             source = table
         self.update_model({"tables": {table: {"id": table, "source": source}}})
+        if self.project_config is not None:  # make sure the table has a file path
+            table_data = self.model_data["tables"][table]
+            if table_data.path is None:
+                table_data.path = (
+                    self.project_config.root
+                    / self.project_config.tables_path
+                    / f"{table}.yml"
+                )
+                table_data.flush()
         for ref in tree.find_data("related"):
             str_shorthand = _get_subtree_str(definition, ref)
             self.update_shorthand_related(f"{table} {str_shorthand}")
@@ -267,15 +288,26 @@ class Project:
         self.update_model(update)
 
     def update_shorthand_metric(self, definition: str, table: Optional[str] = None):
-        calc = _get_calculation_kwargs(definition)
+        id_, calc = _get_calculation_kwargs(definition)
         calc["table"] = calc.get("table", table)
-        update = {"metrics": {calc["id"]: calc}}
+        update = {"metrics": {id_: calc}}
         self.update_model(update)
 
+        # make sure metric has a path
+        if self.project_config is not None:
+            metric_data = self.model_data["metrics"][id_]
+            if metric_data.path is None:
+                metric_data.path = (
+                    self.project_config.root
+                    / self.project_config.metrics_path
+                    / f"{id_}.yml"
+                )
+                metric_data.flush()
+
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
-        calc = _get_calculation_kwargs(definition)
+        id_, calc = _get_calculation_kwargs(definition)
         calc["table"] = calc.get("table", table)
-        update = {"tables": {calc["table"]: {"dimensions": {calc["id"]: calc}}}}
+        update = {"tables": {calc["table"]: {"dimensions": {id_: calc}}}}
         self.update_model(update)
 
     def update_model(self, update: dict):
