@@ -29,7 +29,9 @@ def project(backend):
 @pytest.fixture(scope="session")
 def chinook():
     os.environ["CHINOOK_DATABASE"] = ""
-    return Model.from_config(schema.Project.load(chinook_path).get_model())
+    from dictum_core import Project
+
+    return Project.example("chinook").model
 
 
 @pytest.fixture(scope="session")

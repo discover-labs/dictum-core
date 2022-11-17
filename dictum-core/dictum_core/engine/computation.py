@@ -5,10 +5,10 @@ from typing import List, Optional, Union
 from lark import Tree
 
 import dictum_core.model
-from dictum_core import schema
 from dictum_core.engine.result import DisplayInfo
 from dictum_core.model import utils
 from dictum_core.model.expr import parse_expr
+from dictum_core.model.types import Type
 
 
 @dataclass
@@ -25,7 +25,7 @@ class Column:
 
     name: str
     expr: Tree
-    type: schema.Type
+    type: Type
     display_info: Optional[DisplayInfo] = None
 
     @property

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 from typing import Dict, List, Literal, Optional
 
-from dictum_core import schema
 from dictum_core.format import Format
+from dictum_core.model.types import Type
 
 
 @dataclass
@@ -34,7 +34,7 @@ class DisplayInfo:
     column_name: str
     format: Format
     kind: DisplayColumnKind
-    type: Optional[schema.Type] = None
+    type: Optional[Type] = None
     keep_display_name: bool = False
     altair_time_unit: Optional[str] = None
 

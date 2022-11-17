@@ -88,7 +88,7 @@ def version():
 def catalog(
     path: Optional[Path] = typer.Argument(default=None), output: Optional[Path] = None
 ):
-    project = Project(path=path)
+    project = Project.from_path(path=path)
     metrics = [CatalogMetric.from_orm(m) for m in project.model.metrics.values()]
     catalog = Catalog(
         name=project.model.name, description=project.model.description, metrics=metrics

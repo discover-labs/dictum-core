@@ -1,5 +1,5 @@
 from datetime import datetime
-from functools import cached_property, lru_cache
+from functools import lru_cache
 from numbers import Number
 from typing import Any, Optional
 
@@ -8,7 +8,8 @@ from babel.dates import format_datetime, match_skeleton
 from babel.numbers import format_currency, format_decimal, format_percent
 
 from dictum_core.format import d3
-from dictum_core.schema import FormatConfig, Type
+from dictum_core.model.types import Type
+from dictum_core.schema.model.format import Format, FormatConfig
 
 grain_skeletons = {
     "year": "y",
@@ -156,12 +157,23 @@ class DatetimeFormat(BaseFormatKind):
 
 
 class Format:
-    def __init__(self, locale: str, type: Type, config: Optional[FormatConfig] = None):
+    def __init__(
+        self,
+        locale: str,
+        type: Type,
+        default_currency: Optional[str] = None,
+        config: Optional[Format] = None,
+    ):
         self.locale = locale
         self.type = type
+        self.default_currency = default_currency
+        if isinstance(config, str):
+            config = FormatConfig(kind=config)
+        if config is not None and config.kind == "currency" and config.currency is None:
+            config.currency = default_currency
         self.config = config
 
-    @cached_property
+    @property
     def kind(self) -> BaseFormatKind:
         if not isinstance(self.config, FormatConfig):
             if self.type.name == "str":

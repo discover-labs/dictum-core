@@ -7,7 +7,6 @@ from dictum_core.schema.model.calculations import (
 )
 from dictum_core.schema.model.format import FormatConfig
 from dictum_core.schema.model.table import Table
-from dictum_core.schema.model.types import Type
 from dictum_core.schema.project import Project
 from dictum_core.schema.query import (
     Query,
@@ -37,5 +36,4 @@ __all__ = [
     "QueryTableTransform",
     "QueryTransform",
     "Table",
-    "Type",
 ]

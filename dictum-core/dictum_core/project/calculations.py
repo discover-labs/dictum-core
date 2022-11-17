@@ -127,9 +127,12 @@ class ProjectMetric(ProjectMetricRequest):
 class ProjectMetrics:
     def __init__(self, project: "dictum_core.project.Project"):
         self.__project = project
+        self.__mount_attributes()
+
+    def __mount_attributes(self):
         self.__metrics: Dict[str, ProjectMetric] = {
-            m.id: ProjectMetric(m, project.model.locale)
-            for m in project.model.metrics.values()
+            m.id: ProjectMetric(m, self.__project.model.locale)
+            for m in self.__project.model.metrics.values()
         }
 
     def __getattr__(self, attr: str) -> ProjectMetric:
@@ -185,9 +188,12 @@ class ProjectDimension(ProjectDimensionRequest):
 class ProjectDimensions:
     def __init__(self, project: "dictum_core.project.Project"):
         self.__project = project
+        self.__mount_attributes()
+
+    def __mount_attributes(self):
         self.__dimensions: Dict[str, ProjectDimension] = {
-            d.id: ProjectDimension(d, project.model.locale)
-            for d in project.model.dimensions.values()
+            d.id: ProjectDimension(d, self.__project.model.locale)
+            for d in self.__project.model.dimensions.values()
         }
 
     def __getattr__(self, attr: str) -> ProjectDimension:

@@ -1,6 +1,5 @@
+from dataclasses import dataclass
 from typing import List, Literal, Optional
-
-from pydantic import BaseModel
 
 grain_grains = {
     "year": ["year"],
@@ -17,11 +16,12 @@ grain_grains = {
 grains = set(grain_grains)
 
 
-class Type(BaseModel):
+@dataclass
+class Type:
     name: Literal["bool", "int", "float", "datetime", "str"]
     grain: Optional[
         Literal["year", "quarter", "month", "week", "day", "hour", "minute", "second"]
-    ]
+    ] = None
 
     @property
     def grains(self) -> List[str]:

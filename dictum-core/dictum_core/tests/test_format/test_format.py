@@ -1,7 +1,8 @@
 from datetime import datetime
 
 from dictum_core.format import Format
-from dictum_core.schema import FormatConfig, Type
+from dictum_core.model.types import Type
+from dictum_core.schema import FormatConfig
 
 locale = "en_US"
 

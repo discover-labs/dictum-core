@@ -1,8 +1,8 @@
-from pathlib import Path
-
 from lark import Lark, Token, Transformer, Tree
 
-from dictum_core import utils
+from dictum_core import grammars, utils
+
+grammars = grammars.__file__
 
 
 class Preprocessor(Transformer):
@@ -49,8 +49,7 @@ class Preprocessor(Transformer):
         return Tree("call", [fn, *args])
 
 
-grammar = Path(__file__).parent / "expr.lark"
-parser = Lark(grammar.read_text(), start="expr", lexer="standard")
+parser = Lark.open("expr.lark", rel_to=grammars, start="expr", lexer="standard")
 preprocessor = Preprocessor()
 
 

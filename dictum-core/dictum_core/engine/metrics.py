@@ -15,6 +15,7 @@ from dictum_core.engine.operators import (
 from dictum_core.engine.result import DisplayInfo
 from dictum_core.format import Format
 from dictum_core.model import Metric, Model
+from dictum_core.model.types import Type
 from dictum_core.schema import (
     FormatConfig,
     Query,
@@ -23,7 +24,6 @@ from dictum_core.schema import (
     QueryMetric,
     QueryMetricRequest,
     QueryTableTransform,
-    Type,
 )
 
 
