@@ -2,7 +2,8 @@ from unittest import mock
 
 import pytest
 
-from dictum_core.backends.base import ExpressionTransformer, Secret
+from dictum_core.backends.base import ExpressionTransformer
+from dictum_core.backends.secret import Secret
 from dictum_core.backends.sql_alchemy import SQLAlchemyBackend
 from dictum_core.project.actions import _get_backend_parameters
 

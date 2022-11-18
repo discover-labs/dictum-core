@@ -5,7 +5,8 @@ from pathlib import Path
 import yaml
 from jinja2 import Template
 
-from dictum_core.backends.base import Backend, Secret
+from dictum_core.backends.base import Backend
+from dictum_core.backends.secret import Secret
 
 template_path = Path(__file__).parent / "project_template"
 

@@ -439,12 +439,6 @@ def _wrap_init(fn):
     return wrapped_init
 
 
-class Secret:
-    """Type annotation for secret backend parameters. Parameters annotated with this
-    class won't show up in generated configs.
-    """
-
-
 class Backend(ABC):
     """User-facing. Gets connection details, knows about it's compiler. Compiles
     the incoming computation, executes on the client.
