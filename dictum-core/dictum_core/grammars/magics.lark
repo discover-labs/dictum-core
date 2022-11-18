@@ -12,11 +12,19 @@ calculation: id "=" expr [ "@" table ] [ "::" type ] [ "AS"i alias ]
 related: alias "|" column "->" table [ "." column ]
 related_standalone: table related
 
-metric: "metric" calculation
-dimension: "dimension" calculation
+format: IDENTIFIER | key_value+
 
-key_value: IDENTIFIER "=" IDENTIFIER
-source: key_value*
-table_full: table source? ( related | metric | dimension )*
+metric: "metric"i calculation
+dimension: "dimension"i calculation
+table_format: "format"i format
+
+key_value: IDENTIFIER "=" identifier  // value can be quoted
+key_values: key_value+
+
+source: IDENTIFIER | key_values
+pk: "[" IDENTIFIER "]"
+
+table_def: table pk? source?
+table_full: table_def ( related | metric | dimension | table_format )*
 
 %ignore /\s/

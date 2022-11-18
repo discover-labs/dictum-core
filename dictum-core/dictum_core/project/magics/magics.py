@@ -77,3 +77,7 @@ class ProjectMagics(Magics):
     @line_magic
     def metric(self, line: str):
         self.project.update_shorthand_metric(line)
+
+    @line_magic
+    def format(self, line: str):
+        self.project.update_shorthand_format(line)

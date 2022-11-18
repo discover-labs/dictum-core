@@ -11,6 +11,7 @@ calculation_parser = Lark.open(
 table_parser = Lark.open(
     "magics.lark", rel_to=grammars, start="table_full", propagate_positions=True
 )
+format_parser = Lark.open("magics.lark", rel_to=grammars, start="format")
 
 
 class Preprocessor(Transformer):
@@ -22,6 +23,9 @@ class Preprocessor(Transformer):
 
     def key_value(self, children: list):
         return tuple(children)
+
+    def key_values(self, children: list):
+        return dict(children)
 
     def ql__IDENTIFIER(self, token: Token):
         return token.value.strip('"')
@@ -41,5 +45,9 @@ def parse_shorthand_calculation(definition: str) -> Tree:
     return preprocessor.transform(calculation_parser.parse(definition))
 
 
-def parse_shorthand_related(definition: str):
+def parse_shorthand_related(definition: str) -> Tree:
     return preprocessor.transform(related_parser.parse(definition))
+
+
+def parse_shorthand_format(definition: str) -> Tree:
+    return preprocessor.transform(format_parser.parse(definition))

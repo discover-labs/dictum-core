@@ -16,6 +16,7 @@ from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
     parse_shorthand_calculation,
+    parse_shorthand_format,
     parse_shorthand_related,
     parse_shorthand_table,
 )
@@ -77,6 +78,8 @@ class Project:
         self.metrics = ProjectMetrics(self)
         self.dimensions = ProjectDimensions(self)
         self.m, self.d = self.metrics, self.dimensions
+
+        self.latest_calc = None
 
         if self.model.theme is not None:
             alt.themes.register("dictum_theme", lambda: self.model.theme)
@@ -236,12 +239,21 @@ class Project:
 
     def update_shorthand_table(self, definition: str):
         tree = parse_shorthand_table(definition)
-        table, source, *_ = tree.children
-        table = table.children[0]
-        source = dict(source.children)
-        if not source:
+
+        table_def, *items = tree.children
+        table = table_def.children[0].children[0]
+        source = next(table_def.find_data("source"), None)
+        if source is not None:
+            source = source.children[0]
+        if source is None:
             source = table
-        self.update_model({"tables": {table: {"id": table, "source": source}}})
+        data = {"id": table, "source": source}
+
+        pk = next(table_def.find_data("pk"), None)
+        if pk is not None:
+            data["primary_key"] = pk.children[0]
+        self.update_model({"tables": {table: data}})
+
         if self.project_config is not None:  # make sure the table has a file path
             table_data = self.model_data["tables"][table]
             if table_data.path is None:
@@ -251,17 +263,24 @@ class Project:
                     / f"{table}.yml"
                 )
                 table_data.flush()
-        for ref in tree.find_data("related"):
-            str_shorthand = _get_subtree_str(definition, ref)
-            self.update_shorthand_related(f"{table} {str_shorthand}")
-        for ref in tree.find_data("dimension"):
-            self.update_shorthand_dimension(
-                _get_subtree_str(definition, ref.children[0]), table
-            )
-        for ref in tree.find_data("metric"):
-            self.update_shorthand_metric(
-                _get_subtree_str(definition, ref.children[0]), table
-            )
+
+        # add items
+        for item in items:
+            if item.data == "related":
+                str_shorthand = _get_subtree_str(definition, item)
+                self.update_shorthand_related(f"{table} {str_shorthand}")
+            elif item.data == "dimension":
+                self.update_shorthand_dimension(
+                    _get_subtree_str(definition, item.children[0]), table
+                )
+            elif item.data == "metric":
+                self.update_shorthand_metric(
+                    _get_subtree_str(definition, item.children[0]), table
+                )
+            elif item.data == "table_format":
+                self.update_shorthand_format(
+                    _get_subtree_str(definition, item.children[0])
+                )
 
     def update_shorthand_related(self, definition: str):
         tree = parse_shorthand_related(definition)
@@ -304,11 +323,29 @@ class Project:
                 )
                 metric_data.flush()
 
+        self.latest_calc = self.model_data["metrics"][id_]
+
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
         id_, calc = _get_calculation_kwargs(definition)
-        calc["table"] = calc.get("table", table)
-        update = {"tables": {calc["table"]: {"dimensions": {id_: calc}}}}
+        schema.Dimension.parse_obj(calc)  # validate before updating
+        if table is None:
+            table = calc.pop("table", None)
+        if table is None:
+            raise ValueError("Table is required, please specify with '@ table'")
+        update = {"tables": {table: {"dimensions": {id_: calc}}}}
         self.update_model(update)
+
+        self.latest_calc = self.model_data["tables"][table]["dimensions"][id_]
+
+    def update_shorthand_format(self, definition: str):
+        format = parse_shorthand_format(definition)
+        if isinstance(format.children[0], str):
+            format = format.children[0]
+        else:
+            format = dict(format.children)
+        update = {"format": format}
+        self.latest_calc.update_recursive(update)
+        self.update_model({})
 
     def update_model(self, update: dict):
         self.model_data.update_recursive(update)

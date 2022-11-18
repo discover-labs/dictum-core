@@ -4,27 +4,64 @@ import yaml
 from lark import Tree
 
 from dictum_core.project.magics.magics import ProjectMagics
-from dictum_core.project.magics.parser import parse_shorthand_table
+from dictum_core.project.magics.parser import (
+    parse_shorthand_format,
+    parse_shorthand_table,
+)
 from dictum_core.project.project import Project
 
 
 def test_parse_raw_table():
-    result = parse_shorthand_table("test")
-    assert result.children == [Tree("table", ["test"]), Tree("source", [])]
+    parse_shorthand_table("test") == Tree("table_full", [Tree("table", ["test"])])
+
+
+def test_parse_table_with_pk():
+    parse_shorthand_table("test[pk]") == Tree(
+        "table_full", [Tree("table", ["test"]), Tree("pk", ["pk"])]
+    )
+
+
+def test_parse_table_with_pk_source():
+    result = parse_shorthand_table("test[pk] src")
+    assert result == Tree(
+        "table_full",
+        [Tree("table", ["test"]), Tree("pk", ["pk"]), Tree("source", ["src"])],
+    )
+
+
+def test_parse_table_with_pk_source_kv():
+    result = parse_shorthand_table("test[pk] src=x y=z")
+    assert result == Tree(
+        "table_full",
+        [
+            Tree("table", ["test"]),
+            Tree("pk", ["pk"]),
+            Tree("source", [{"src": "x", "y": "z"}]),
+        ],
+    )
 
 
 def test_parse_table_with_source():
-    result = parse_shorthand_table("test schema=public table=what")
-    assert result.children == [
+    parse_shorthand_table("test schema=public table=what").children == [
         Tree("table", ["test"]),
-        Tree("source", [("schema", "public"), ("table", "what")]),
+        Tree("source", [{"schema": "public", "table": "what"}]),
     ]
 
 
 def test_parse_table_with_related():
     result = parse_shorthand_table("test related | column -> other.column")
-    _, _, related = result.children
+    _, related = result.children
     assert related.data == "related"
+
+
+def test_parse_format_str():
+    result = parse_shorthand_format("currency")
+    assert result == Tree("format", ["currency"])
+
+
+def test_parse_format_kv():
+    result = parse_shorthand_format("kind=currency currency=USD")
+    assert result == Tree("format", [("kind", "currency"), ("currency", "USD")])
 
 
 def test_create_project_from_scratch(tmp_path: Path, project: Project):
@@ -32,6 +69,12 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
     magics = ProjectMagics(project)
     magics.table("invoice_items")
     magics.metric("revenue = sum(Quantity * UnitPrice) @ invoice_items")
+    magics.format("currency")
+    assert (
+        yaml.safe_load((tmp_path / "metrics" / "revenue.yml").read_text())["format"]
+        == "currency"
+    )
+
     magics.table("invoices")
     magics.related("invoice_items invoice | InvoiceId -> invoices.InvoiceId")
     magics.dimension("date = InvoiceDate @ invoices ::date")
@@ -48,8 +91,8 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
     metric tracks = count()
     dimension track_length = Milliseconds / 1000 / 60 ::float
     """
-    magics.table(line="tracks", cell=cell)
-    magics.related("invoice_items track | TrackId -> tracks.TrackId")
+    magics.table(line="tracks[TrackId]", cell=cell)
+    magics.related("invoice_items track | TrackId -> tracks")
     magics.metric(
         "unique_paying_customers = countd(invoice.CustomerId) @ invoice_items"
     )

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dictum-core"
-version = "0.1.9"
+version = "0.1.10"
 description = "Core library for Dictum"
 authors = ["Mikhail Akimov"]
 
@@ -15,8 +15,6 @@ Jinja2 = "^3.0.1"
 sqlparse = "^0.4.2"
 Babel = "^2.9.1"
 altair = "^4.2"
-typer = "^0.6.1"
-rich = "^12.5.1"
 jupyter = "^1.0.0"
 
 [tool.poetry.dev-dependencies]
