@@ -1,4 +1,3 @@
-import inspect
 from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
@@ -470,21 +469,6 @@ class Backend(ABC):
         if parameters is None:
             parameters = {}
         return cls.registry[type](**parameters)
-
-    def get_parameters(self) -> dict:
-        result = {}
-        for name, par in inspect.signature(self.__init__).parameters.items():
-            if name == "self":
-                continue
-            if name not in self.parameters:
-                raise KeyError(
-                    f"Missing parameter {name} in {self.type} backend parameters"
-                )
-            if par.annotation is Secret:
-                result[name] = None
-            else:
-                result[name] = self.parameters[name]
-        return result
 
     @classmethod
     def discover_plugins(cls):

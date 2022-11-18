@@ -1,12 +1,30 @@
+import inspect
 import shutil
 from pathlib import Path
 
 import yaml
 from jinja2 import Template
 
-from dictum_core.backends.base import Backend
+from dictum_core.backends.base import Backend, Secret
 
 template_path = Path(__file__).parent / "project_template"
+
+
+def _get_backend_parameters(backend: Backend) -> dict:
+    result = {}
+    for name, par in inspect.signature(backend.__init__).parameters.items():
+        if name == "self":
+            continue
+        if name not in backend.parameters:
+            raise KeyError(
+                f"Missing parameter {name} in {backend.type} backend parameters"
+            )
+        if par.annotation is Secret:
+            var_name = f"DICTUM_SECRET_{backend.type}_{name}".upper()
+            result[name] = "{{ env.%s }}" % var_name
+        else:
+            result[name] = backend.parameters[name]
+    return result
 
 
 def copy_project_template(target_path: Path, template_vars: dict):
@@ -42,7 +60,7 @@ def create_new_project(
             "project_name": name,
             "profile": "default",
             "backend": backend.type,
-            "backend_parameters": yaml.safe_dump(backend.get_parameters()),
+            "backend_parameters": yaml.safe_dump(_get_backend_parameters(backend)),
             "currency": currency,
             "locale": locale,
         }

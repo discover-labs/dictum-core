@@ -4,6 +4,7 @@ import pytest
 
 from dictum_core.backends.base import ExpressionTransformer, Secret
 from dictum_core.backends.sql_alchemy import SQLAlchemyBackend
+from dictum_core.project.actions import _get_backend_parameters
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -47,10 +48,12 @@ def test_sqlalchemy_override_default_schema():
 
 def test_secret_parameters():
     class SecretBackend(SQLAlchemyBackend):
+        type = "secret"
+
         def __init__(self, secret: Secret = "secret", x: int = 1):
             super().__init__(secret=secret, x=x)
 
     backend = SecretBackend()
-    parameters = backend.get_parameters()
+    parameters = _get_backend_parameters(backend)
     assert parameters["x"] == 1
-    assert parameters["secret"] is None
+    assert parameters["secret"] == "{{ env.DICTUM_SECRET_SECRET_SECRET }}"
