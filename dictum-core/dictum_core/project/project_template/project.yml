@@ -1,8 +1,8 @@
 name: {{ project_name }}
 # description: Optional project description
 
-locale: en_US
-currency: USD
+locale: {{ locale }}
+currency: {{ currency }}
 
 tables_path: tables
 metrics_path: metrics

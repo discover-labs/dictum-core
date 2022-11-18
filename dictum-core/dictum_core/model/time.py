@@ -1,5 +1,5 @@
 from dictum_core.format import Format
-from dictum_core.schema import Type
+from dictum_core.model.types import Type
 
 
 class GenericTimeDimension:

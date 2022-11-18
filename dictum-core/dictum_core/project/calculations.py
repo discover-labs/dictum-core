@@ -1,5 +1,6 @@
-from typing import Dict
 from copy import deepcopy
+from typing import Dict
+
 import altair as alt
 
 import dictum_core.model
@@ -8,7 +9,7 @@ from dictum_core.engine.metrics import limit_transforms
 from dictum_core.engine.metrics import transforms as table_transforms
 from dictum_core.model.scalar import transforms as scalar_transforms
 from dictum_core.project.altair.encoding import AltairEncodingChannelHook
-from dictum_core.project.templates import environment
+from dictum_core.project.templates import environment, lineage_spec
 from dictum_core.schema.query import (
     QueryDimension,
     QueryDimensionRequest,
@@ -17,7 +18,6 @@ from dictum_core.schema.query import (
     QueryScalarTransform,
     QueryTableTransform,
 )
-from dictum_core.project.templates import lineage_spec
 
 scalar_transforms = set(scalar_transforms)
 table_transforms = set(table_transforms) | set(limit_transforms)
@@ -99,6 +99,10 @@ class ProjectMetricRequest(ProjectCalculation):
     def __call__(self, *args, of=None, within=None):
         of = [] if of is None else of
         within = [] if within is None else within
+        if isinstance(of, ProjectDimensionRequest):
+            of = [of]
+        if isinstance(within, ProjectDimensionRequest):
+            within = [within]
         self.request.metric.transforms[-1].args = list(args)
         self.request.metric.transforms[-1].of = [i.request for i in of]
         self.request.metric.transforms[-1].within = [i.request for i in within]
@@ -123,9 +127,12 @@ class ProjectMetric(ProjectMetricRequest):
 class ProjectMetrics:
     def __init__(self, project: "dictum_core.project.Project"):
         self.__project = project
+        self.__mount_attributes()
+
+    def __mount_attributes(self):
         self.__metrics: Dict[str, ProjectMetric] = {
-            m.id: ProjectMetric(m, project.model.locale)
-            for m in project.model.metrics.values()
+            m.id: ProjectMetric(m, self.__project.model.locale)
+            for m in self.__project.model.metrics.values()
         }
 
     def __getattr__(self, attr: str) -> ProjectMetric:
@@ -181,9 +188,12 @@ class ProjectDimension(ProjectDimensionRequest):
 class ProjectDimensions:
     def __init__(self, project: "dictum_core.project.Project"):
         self.__project = project
+        self.__mount_attributes()
+
+    def __mount_attributes(self):
         self.__dimensions: Dict[str, ProjectDimension] = {
-            d.id: ProjectDimension(d, project.model.locale)
-            for d in project.model.dimensions.values()
+            d.id: ProjectDimension(d, self.__project.model.locale)
+            for d in self.__project.model.dimensions.values()
         }
 
     def __getattr__(self, attr: str) -> ProjectDimension:

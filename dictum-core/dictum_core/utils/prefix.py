@@ -1,6 +1,6 @@
 from packaging import version
-from dictum_core import __version__
 
+from dictum_core import __version__
 
 if __name__ == "__main__":
     ver = version.parse(__version__)

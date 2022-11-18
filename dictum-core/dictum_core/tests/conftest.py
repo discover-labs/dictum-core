@@ -3,9 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from dictum_core import schema
 from dictum_core.examples import chinook
-from dictum_core.model import Model
 
 chinook_path = Path(chinook.__file__).parent
 
@@ -29,7 +27,9 @@ def project(backend):
 @pytest.fixture(scope="session")
 def chinook():
     os.environ["CHINOOK_DATABASE"] = ""
-    return Model(schema.Project.load(chinook_path).get_model())
+    from dictum_core import Project
+
+    return Project.example("chinook").model
 
 
 @pytest.fixture(scope="session")

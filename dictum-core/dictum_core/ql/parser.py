@@ -1,9 +1,10 @@
-from pathlib import Path
-
 from lark import Lark, Token, Transformer, Tree
 
-grammar = (Path(__file__).parent / "ql.lark").read_text()
-ql = Lark(grammar, start="query")
+from dictum_core import grammars
+
+grammars = grammars.__file__
+
+ql = Lark.open("ql.lark", rel_to=grammars, start="query")
 
 
 def filter_tree(name: str, dimension: Tree, value):
@@ -66,7 +67,7 @@ def parse_ql(query: str):
     return pre.transform(ql.parse(query))
 
 
-dimension = Lark(grammar, start="dimension")
+dimension = Lark.open("ql.lark", rel_to=grammars, start="dimension")
 
 
 def parse_dimension(expr: str):
@@ -76,21 +77,21 @@ def parse_dimension(expr: str):
     return pre.transform(dimension.parse(expr))
 
 
-dimension_request = Lark(grammar, start="dimension_request")
+dimension_request = Lark.open("ql.lark", rel_to=grammars, start="dimension_request")
 
 
 def parse_dimension_request(expr: str):
     return pre.transform(dimension_request.parse(expr))
 
 
-metric = Lark(grammar, start="metric")
+metric = Lark.open("ql.lark", rel_to=grammars, start="metric")
 
 
 def parse_metric(expr: str):
     return pre.transform(metric.parse(expr))
 
 
-metric_request = Lark(grammar, start="metric_request")
+metric_request = Lark.open("ql.lark", rel_to=grammars, start="metric_request")
 
 
 def parse_metric_request(expr: str):

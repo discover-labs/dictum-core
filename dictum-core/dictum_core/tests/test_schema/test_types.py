@@ -1,7 +1,6 @@
 import pytest
 
-from dictum_core.schema.model.calculations import Displayed
-from dictum_core.schema.model.types import Type, grains, resolve_type
+from dictum_core.model.types import Type, grains, resolve_type
 
 
 def test_resolve_basic_types():
@@ -41,15 +40,6 @@ def test_resolve_grain_invalid_type():
 def test_resolve_unknown_type():
     with pytest.raises(ValueError, match=r"Unknown type: unknown"):
         resolve_type("unknown")
-
-
-def test_calculation_resolve_type():
-    val = Displayed.parse_obj({"id": "id", "name": "name", "type": "int"})
-    assert isinstance(val.type, Type)
-    assert val.type == Type(name="int")
-
-    val = Displayed(id="id", name="name", type="datetime:week")
-    assert val.type == Type(name="datetime", grain="week")
 
 
 def test_type_grains():

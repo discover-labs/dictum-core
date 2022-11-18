@@ -1,8 +1,7 @@
-import inspect
-from collections import UserDict
-from functools import cached_property
 from abc import ABC, abstractmethod
+from collections import UserDict
 from dataclasses import dataclass
+from functools import cached_property, wraps
 from typing import Any, Dict, List, Optional
 
 import pkg_resources
@@ -427,6 +426,19 @@ class BackendRegistry(UserDict):
         return iter(self.registry)
 
 
+def _wrap_init(fn):
+    @wraps(fn)
+    def wrapped_init(self, *args, **kwargs):
+        result = fn(self, *args, **kwargs)
+        if not hasattr(self, "parameters"):
+            raise TypeError(
+                "All Backend subclasses must set a 'parameters' instance attribute"
+            )
+        return result
+
+    return wrapped_init
+
+
 class Backend(ABC):
     """User-facing. Gets connection details, knows about it's compiler. Compiles
     the incoming computation, executes on the client.
@@ -437,27 +449,20 @@ class Backend(ABC):
 
     registry: BackendRegistry = BackendRegistry()
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         self.compiler = self.compiler_cls(self)
+        self.parameters = kwargs
 
     def __init_subclass__(cls):
         if hasattr(cls, "type"):
             cls.registry[cls.type] = cls
+        cls.__init__ = _wrap_init(cls.__init__)
 
     @classmethod
     def create(cls, type: str, parameters: Optional[dict] = None):
         if parameters is None:
             parameters = {}
         return cls.registry[type](**parameters)
-
-    @classmethod
-    def parameters(cls) -> dict:
-        result = {}
-        for name, par in inspect.signature(cls.__init__).parameters.items():
-            if name == "self":
-                continue
-            result[name] = par.default if par.default != inspect._empty else None
-        return result
 
     @classmethod
     def discover_plugins(cls):

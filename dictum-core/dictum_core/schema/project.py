@@ -1,6 +1,5 @@
 import os
 from getpass import getpass
-from itertools import chain
 from pathlib import Path
 from typing import Dict, Optional, Union
 
@@ -9,21 +8,6 @@ from jinja2 import Template
 from pydantic import BaseModel
 
 from dictum_core.schema.id import ID
-from dictum_core.schema.model import Model
-
-root_items = {"tables", "metrics", "unions", "profiles"}
-
-
-def _merge(target: dict, source: dict):
-    result = target.copy()
-    for k, v in source.items():
-        if k in root_items:
-            result[k] = _merge(result.get(k, {}), source[k])
-            continue
-        if k in result:
-            raise KeyError(f"Duplicate key in project config: {k}")
-        result[k] = v
-    return result
 
 
 class Env:
@@ -44,32 +28,6 @@ env = Env()
 
 def _load_yaml_template(path: Path):
     return yaml.load(Template(path.read_text()).render(env=env), Loader=yaml.SafeLoader)
-
-
-def _load_dict_from_path(path: Union[str, Path]) -> dict:
-    """Load a single YAML file or multiple YAML files in nested folders."""
-    path = Path(path)
-    if path.is_file():
-        result = _load_yaml_template(path)
-        if result is None:
-            result = {}
-        if not isinstance(result, dict):
-            raise TypeError(f"Error loading {path}: top-level object must be a dict")
-        return result
-
-    if path.is_dir():
-        result = {}
-        for file in chain(path.glob("**/*.yml"), path.glob("**/*.yaml")):
-            key = file.stem
-            data = _load_yaml_template(file)
-            if not isinstance(data, dict):
-                raise TypeError(
-                    f"Error loading {path}: top-level object must be a dict"
-                )
-            result[key] = data
-        return result
-
-    raise FileNotFoundError(f"Path {path} does not exist")
 
 
 class Profile(BaseModel):
@@ -93,7 +51,7 @@ class Project(BaseModel):
     unions_path: str = "unions.yml"
     profiles_path: str = "profiles.yml"
 
-    root: Path
+    root: Optional[Path]
 
     @classmethod
     def load(cls, path: Union[str, Path]):
@@ -117,11 +75,3 @@ class Project(BaseModel):
             return profiles.profiles[profile]
         except KeyError:
             raise KeyError(f"Profile {profile} is not present in profiles")
-
-    def get_model(self) -> Model:
-        data = {}
-        data["tables"] = _load_dict_from_path(self.root / self.tables_path)
-        data["metrics"] = _load_dict_from_path(self.root / self.metrics_path)
-        data["unions"] = _load_dict_from_path(self.root / self.unions_path)
-        data.update(self.dict(include={"name", "description", "locale", "currency"}))
-        return Model.parse_obj(data)

@@ -1,18 +1,17 @@
 from copy import deepcopy
 from dataclasses import dataclass
-from functools import cached_property
 from typing import Any, Dict, List, Optional, Tuple
 
 from lark import Transformer, Tree
 
 import dictum_core.model
-from dictum_core import schema
 from dictum_core.format import Format
 from dictum_core.model import utils
 from dictum_core.model.expr import get_expr_kind, parse_expr
 from dictum_core.model.scalar import ScalarTransformMeta, transforms_by_input_type
 from dictum_core.model.time import GenericTimeDimension
 from dictum_core.model.time import dimensions as time_dimensions
+from dictum_core.model.types import Type
 from dictum_core.utils import value_to_token
 
 
@@ -25,7 +24,7 @@ class Displayed:
     id: str
     name: str
     description: str
-    type: schema.Type
+    type: Type
     format: Optional[Format]
     missing: Optional[Any]
 
@@ -36,19 +35,19 @@ class Calculation(Displayed):
 
     str_expr: str
 
-    @cached_property
+    @property
     def expr(self) -> Tree:
         raise NotImplementedError
 
-    @cached_property
+    @property
     def parsed_expr(self):
         return parse_expr(self.str_expr)
 
-    @cached_property
+    @property
     def expr_tree(self) -> str:
         return self.expr.pretty()
 
-    @cached_property
+    @property
     def kind(self) -> str:
         try:
             return get_expr_kind(self.parsed_expr)
@@ -138,7 +137,7 @@ class DimensionTransformer(Transformer):
 class Dimension(TableCalculation):
     is_union: bool = False
 
-    @cached_property
+    @property
     def expr(self) -> Tree:
         self.check_references()
         transformer = DimensionTransformer(
@@ -179,7 +178,7 @@ class TableFilter:
     table: "dictum_core.model.Table"
     str_expr: str
 
-    @cached_property
+    @property
     def expr(self) -> Tree:
         expr = parse_expr(self.str_expr)
         transformer = DimensionTransformer(
@@ -238,7 +237,7 @@ class Measure(TableCalculation):
                 f"Measures must be aggregate, {self} expression is not: {self.str_expr}"
             )
 
-    @cached_property
+    @property
     def expr(self) -> Tree:
         self.check_references()
         transformer = MeasureTransformer(
@@ -246,7 +245,7 @@ class Measure(TableCalculation):
         )
         return transformer.transform(self.parsed_expr)
 
-    @cached_property
+    @property
     def filter(self) -> Tree:
         if self.str_filter is None:
             return None
@@ -261,7 +260,7 @@ class Measure(TableCalculation):
         if self.str_time is not None:  # explicit time
             return self.table.allowed_dimensions[self.str_time]
 
-    @cached_property
+    @property
     def dimensions(self) -> Dict[str, Dimension]:
         result = self.table.allowed_dimensions.copy()
         if self.str_time is not None:
@@ -331,7 +330,7 @@ class Metric(Calculation):
             is_measure=True,
         )
 
-    @cached_property
+    @property
     def expr(self) -> Tree:
         metrics = self.model.metrics.copy()
         del metrics[self.id]
@@ -356,7 +355,7 @@ class Metric(Calculation):
             )
         return expr
 
-    @cached_property
+    @property
     def merged_expr(self) -> Tree:
         """Same as expr, but measures are selected as columns from the merged table"""
         expr = deepcopy(self.expr)
@@ -365,14 +364,14 @@ class Metric(Calculation):
             ref.children = [None, *ref.children]
         return expr
 
-    @cached_property
+    @property
     def measures(self) -> List[Measure]:
         result = []
         for ref in self.expr.find_data("measure"):
             result.append(self.model.measures.get(ref.children[0]))
         return result
 
-    @cached_property
+    @property
     def dimensions(self) -> List[Dimension]:
         return sorted(
             set.intersection(
@@ -381,7 +380,7 @@ class Metric(Calculation):
             key=lambda x: x.name,
         )
 
-    @cached_property
+    @property
     def generic_time_dimensions(self) -> List[GenericTimeDimension]:
         """Return a list of generic time dimensions available for this metric. All of
         them are available if generic time is defined for all measures used here.
@@ -393,6 +392,6 @@ class Metric(Calculation):
             )
         )
 
-    @cached_property
+    @property
     def lineage(self) -> List[dict]:
         return list(self.model.get_lineage(self))

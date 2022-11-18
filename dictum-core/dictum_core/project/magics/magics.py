@@ -1,10 +1,14 @@
-from IPython.core.magic import Magics, line_cell_magic, magics_class
+from IPython.core.magic import Magics, line_cell_magic, line_magic, magics_class
 from IPython.core.magic_arguments import argument, magic_arguments, parse_argstring
+
+import dictum_core.project.project
 
 
 @magics_class
-class QlMagics(Magics):
-    def __init__(self, project, shell=None, **kwargs):
+class ProjectMagics(Magics):
+    def __init__(
+        self, project: "dictum_core.project.project.Project", shell=None, **kwargs
+    ):
         super().__init__(shell=shell, **kwargs)
         self.project = project
 
@@ -53,3 +57,27 @@ class QlMagics(Magics):
 
         result = self.project.ql(query).df(format=format)
         return result
+
+    @line_cell_magic
+    def table(self, line: str, cell=None):
+        """Create a new table for the current project."""
+        if cell is None:
+            cell = ""
+        definition = f"{line} {cell}"
+        self.project.update_shorthand_table(definition)
+
+    @line_magic
+    def related(self, line: str):
+        self.project.update_shorthand_related(line)
+
+    @line_magic
+    def dimension(self, line: str):
+        self.project.update_shorthand_dimension(line)
+
+    @line_magic
+    def metric(self, line: str):
+        self.project.update_shorthand_metric(line)
+
+    @line_magic
+    def format(self, line: str):
+        self.project.update_shorthand_format(line)

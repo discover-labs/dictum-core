@@ -1,19 +1,17 @@
 from collections import defaultdict
 from dataclasses import dataclass, field
-from functools import cached_property
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from lark import Tree
 
-from dictum_core.model.calculations import Dimension, TableFilter
-from dictum_core.model.dicts import DimensionDict, MeasureDict
+from dictum_core.model.calculations import Dimension, Measure, TableFilter
 
 
 @dataclass
 class RelatedTable:
     str_table: str
-    foreign_key: str
     str_related_key: str
+    foreign_key: str
     alias: str
 
     parent: "Table"
@@ -28,7 +26,7 @@ class RelatedTable:
             )
         return self.tables[self.str_table]
 
-    @cached_property
+    @property
     def related_key(self) -> str:
         if self.str_related_key is not None:
             return self.str_related_key
@@ -41,7 +39,7 @@ class RelatedTable:
             )
         return self.table.primary_key
 
-    @cached_property
+    @property
     def join_expr(self) -> Tree:
         return Tree(
             "expr",
@@ -62,16 +60,28 @@ class Table:
     """Represents a relational data table"""
 
     id: str
-    source: str
+    source: Union[str, Dict[str, str]]
     description: Optional[str] = None
     primary_key: Optional[str] = None
     filters: List[TableFilter] = field(default_factory=list)
     related: Dict[str, RelatedTable] = field(default_factory=dict)
-    measures: MeasureDict = field(default_factory=MeasureDict)
-    dimensions: DimensionDict = field(default_factory=DimensionDict)
+    measures: Dict[str, Measure] = field(default_factory=dict)
+    dimensions: Dict[str, Dimension] = field(default_factory=dict)
     measure_backlinks: Dict[str, "Table"] = field(
         default_factory=dict
     )  # measure_id -> table
+
+    def add_related(
+        self, str_table: str, related_key: str, foreign_key: str, alias: str, tables
+    ):
+        self.related[alias] = RelatedTable(
+            str_table=str_table,
+            str_related_key=related_key,
+            foreign_key=foreign_key,
+            alias=alias,
+            parent=self,
+            tables=tables,
+        )
 
     def find_all_paths(
         self, traversed_tables: Tuple[str] = ()
@@ -84,7 +94,7 @@ class Table:
                 for target, path in rel.table.find_all_paths(traversed_tables):
                     yield target, [rel.alias, *path]
 
-    @cached_property
+    @property
     def allowed_join_paths(self) -> Dict["Table", List[str]]:
         """A dict of table id -> tuple list of related table aliases. Join targets for
         which there exists only a single join path.
@@ -97,7 +107,7 @@ class Table:
             result[rel.table] = [rel.alias]
         return result
 
-    @cached_property
+    @property
     def dimension_join_paths(self) -> Dict[str, List[str]]:
         result = {}
         for target, path in self.allowed_join_paths.items():
@@ -108,7 +118,7 @@ class Table:
             result[dimension_id] = [self.id]
         return result
 
-    @cached_property
+    @property
     def allowed_dimensions(self) -> Dict[str, "Dimension"]:
         """Which dimensions are allowed to be used with this table as anchor.
         Only those to which there's a single direct join path. If there isn't,

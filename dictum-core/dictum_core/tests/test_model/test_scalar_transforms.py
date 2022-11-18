@@ -4,7 +4,7 @@ from lark import Token, Tree
 from dictum_core.engine import Column, DisplayInfo
 from dictum_core.format import Format
 from dictum_core.model.scalar import LiteralTransform, ScalarTransform, transforms
-from dictum_core.schema import Type
+from dictum_core.model.types import Type
 
 
 @pytest.fixture(scope="function")

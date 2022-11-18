@@ -1,24 +1,15 @@
 from typing import Any, Optional
 
-from pydantic import Field, validator
+from pydantic import Field
 
-from dictum_core.schema.id import ID
 from dictum_core.schema.model.format import Formatted
-from dictum_core.schema.model.types import Type, resolve_type
 
 
 class Displayed(Formatted):
-    id: ID
     name: str
     description: Optional[str]
-    type: Type
+    type: str
     missing: Optional[Any]
-
-    @validator("type", pre=True)
-    def resolve_type(cls, value):
-        if isinstance(value, str):
-            return resolve_type(value)
-        return value
 
 
 class Calculation(Displayed):
@@ -26,7 +17,7 @@ class Calculation(Displayed):
 
 
 class AggregateCalculation(Calculation):
-    type: Type = Type(name="float")
+    type: str = "float"
     str_filter: Optional[str] = Field(alias="filter")
     str_time: Optional[str] = Field(alias="time")
 

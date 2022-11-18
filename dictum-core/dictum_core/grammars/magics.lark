@@ -1,0 +1,30 @@
+%import .expr.expr -> expr
+%import .expr.IDENTIFIER -> IDENTIFIER
+%import .ql.identifier -> identifier
+
+id: IDENTIFIER
+type: IDENTIFIER
+table: IDENTIFIER
+column: IDENTIFIER
+alias: identifier
+
+calculation: id "=" expr [ "@" table ] [ "::" type ] [ "AS"i alias ]
+related: alias "|" column "->" table [ "." column ]
+related_standalone: table related
+
+format: IDENTIFIER | key_value+
+
+metric: "metric"i calculation
+dimension: "dimension"i calculation
+table_format: "format"i format
+
+key_value: IDENTIFIER "=" identifier  // value can be quoted
+key_values: key_value+
+
+source: IDENTIFIER | key_values
+pk: "[" IDENTIFIER "]"
+
+table_def: table pk? source?
+table_full: table_def ( related | metric | dimension | table_format )*
+
+%ignore /\s/

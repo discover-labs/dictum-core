@@ -371,10 +371,9 @@ class SQLAlchemyBackend(Backend):
         default_schema: Optional[str] = None,
         **kwargs,
     ):
-        self.parameters = kwargs
         self.pool_size = pool_size
         self.default_schema = default_schema
-        super().__init__()
+        super().__init__(pool_size=pool_size, default_schema=default_schema, **kwargs)
 
     @property
     def url(self) -> str:

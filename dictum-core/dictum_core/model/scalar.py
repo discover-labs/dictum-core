@@ -5,9 +5,8 @@ from lark import Transformer, Tree
 
 from dictum_core import engine, schema
 from dictum_core.format import Format
-from dictum_core.model.dicts import TransformDict
 from dictum_core.model.expr import parse_expr
-from dictum_core.schema import Type
+from dictum_core.model.types import Type
 from dictum_core.utils import value_to_token
 
 
@@ -31,9 +30,9 @@ class ScalarTransformMeta(type):
     pass
 
 
-transforms = TransformDict()
-transforms_by_input_type: Dict[str, TransformDict] = defaultdict(
-    lambda: TransformDict()
+transforms: Dict[str, "ScalarTransform"] = {}
+transforms_by_input_type: Dict[str, Dict[str, "ScalarTransform"]] = defaultdict(
+    lambda: {}
 )
 
 
@@ -46,7 +45,7 @@ class ScalarTransform(metaclass=ScalarTransformMeta):
     name: str
     description: Optional[str] = None
 
-    return_type: Optional[schema.Type] = None
+    return_type: Optional[Type] = None
     input_types: List[str]
 
     def __init__(self, *args):
@@ -54,9 +53,9 @@ class ScalarTransform(metaclass=ScalarTransformMeta):
 
     def __init_subclass__(cls):
         if hasattr(cls, "id") and cls.id is not None:
-            transforms.add(cls)
+            transforms[cls.id] = cls
             for input_type in cls.input_types:
-                transforms_by_input_type[input_type].add(cls)
+                transforms_by_input_type[input_type][cls.id] = cls
 
     def get_name(self, name: str) -> str:
         return name
@@ -64,7 +63,7 @@ class ScalarTransform(metaclass=ScalarTransformMeta):
     def get_display_name(self, name: str) -> str:
         return name
 
-    def get_return_type(self, original: schema.Type) -> schema.Type:
+    def get_return_type(self, original: Type) -> Type:
         if self.return_type is not None:
             return self.return_type
         return original
@@ -240,8 +239,9 @@ class DatepartTransform(LiteralTransform):
     def get_format(self, format: Format) -> Format:
         return Format(
             locale=format.locale,
-            type=schema.Type(name="int"),
+            type=Type(name="int"),
             config=schema.FormatConfig(kind="decimal", pattern="#"),
+            default_currency=format.default_currency,
         )
 
     def get_display_name(self, name: str) -> str:
@@ -329,7 +329,11 @@ class DatetruncTransform(ScalarTransform):
         super().__init__(period)
 
     def get_format(self, format: Format) -> Format:
-        return Format(locale=format.locale, type=self.get_return_type(format.type))
+        return Format(
+            locale=format.locale,
+            type=self.get_return_type(format.type),
+            default_currency=format.default_currency,
+        )
 
     def get_display_info(
         self, display_info: Optional["engine.DisplayInfo"]
@@ -341,7 +345,7 @@ class DatetruncTransform(ScalarTransform):
     def transform_expr(self, expr: Tree):
         return Tree("call", ["datetrunc", *self._args, expr])
 
-    def get_return_type(self, original: schema.Type) -> schema.Type:
+    def get_return_type(self, original: Type) -> Type:
         return Type(name="datetime", grain=self._args[0])
 
 

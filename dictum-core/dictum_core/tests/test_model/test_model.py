@@ -158,3 +158,16 @@ def test_get_lineage(chinook: Model):
     assert len(L) == 6
     assert L[0]["type"] == "Metric"
     assert L[0]["id"].startswith("Metric:")
+
+
+def test_replace_table():
+    model = Model()
+    test = model.add_table(id="test", source="test")
+    related = model.add_table(id="related", source="related")
+    test.add_related(
+        str_table="related",
+        related_key="x",
+        foreign_key="y",
+        alias="related",
+        tables=model.tables,
+    )
