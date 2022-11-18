@@ -20,9 +20,11 @@ def test_update_recursive_setitem(tmp_path: Path):
     path.write_text(yaml.safe_dump(data))
     d = YAMLMappedDict.from_path(path)
     d.update_recursive({"a": {"b": {"c": "test", "e": 3}}})
+    d.flush()
     new_data = yaml.safe_load(path.read_text())
     assert new_data == {"a": {"b": {"c": "test", "d": 2, "e": 3}}}
 
     d["a"]["b"]["e"] = "42"
+    d.flush()
     new_data = yaml.safe_load(path.read_text())
     assert new_data == {"a": {"b": {"c": "test", "d": 2, "e": "42"}}}

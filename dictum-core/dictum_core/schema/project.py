@@ -93,7 +93,7 @@ class Project(BaseModel):
     unions_path: str = "unions.yml"
     profiles_path: str = "profiles.yml"
 
-    root: Path
+    root: Optional[Path]
 
     @classmethod
     def load(cls, path: Union[str, Path]):

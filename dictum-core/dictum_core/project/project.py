@@ -100,9 +100,10 @@ class Project:
         in Jupyter. If path is provided, creates a new project at that path.
         """
         if path is not None:
+            path = Path(path)
             if path.exists() and path.is_dir() and (path / "project.yml").exists():
                 print(f"Project already exists, loading project from {path}")
-                return Project.from_path(path)
+                return Project.from_path(path=path)
             actions.create_new_project(
                 path=path, backend=backend, name=name, currency=currency, locale=locale
             )
@@ -110,7 +111,10 @@ class Project:
             return Project.from_path(path=path)
         model_data = schema.Model(name=name, locale=locale, currency=currency).dict()
         model_data = YAMLMappedDict(model_data)
-        return cls(model_data=model_data, backend=backend)
+        project_config = schema.Project(name=name, locale=locale, currency=currency)
+        return cls(
+            model_data=model_data, backend=backend, project_config=project_config
+        )
 
     @classmethod
     def from_path(
@@ -194,7 +198,7 @@ class Project:
         Arguments:
             name (str):
                 Name of the example project. Valid values: ``chinook``,
-                ``tutorial``.
+                ``empty``.
 
         Returns:
             CachedProject: same as ``Project``, but won't read the model config at each
@@ -254,16 +258,6 @@ class Project:
             data["primary_key"] = pk.children[0]
         self.update_model({"tables": {table: data}})
 
-        if self.project_config is not None:  # make sure the table has a file path
-            table_data = self.model_data["tables"][table]
-            if table_data.path is None:
-                table_data.path = (
-                    self.project_config.root
-                    / self.project_config.tables_path
-                    / f"{table}.yml"
-                )
-                table_data.flush()
-
         # add items
         for item in items:
             if item.data == "related":
@@ -311,18 +305,6 @@ class Project:
         calc["table"] = calc.get("table", table)
         update = {"metrics": {id_: calc}}
         self.update_model(update)
-
-        # make sure metric has a path
-        if self.project_config is not None:
-            metric_data = self.model_data["metrics"][id_]
-            if metric_data.path is None:
-                metric_data.path = (
-                    self.project_config.root
-                    / self.project_config.metrics_path
-                    / f"{id_}.yml"
-                )
-                metric_data.flush()
-
         self.latest_calc = self.model_data["metrics"][id_]
 
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
@@ -345,7 +327,7 @@ class Project:
             format = dict(format.children)
         update = {"format": format}
         self.latest_calc.update_recursive(update)
-        self.update_model({})
+        self.update_model({})  # trigger model update
 
     def update_model(self, update: dict):
         self.model_data.update_recursive(update)
@@ -355,3 +337,37 @@ class Project:
         self.metrics = ProjectMetrics(self)
         self.dimensions = ProjectDimensions(self)
         self.m, self.d = self.metrics, self.dimensions
+
+    def write(self, path: Optional[Union[str, Path]] = None):
+        if isinstance(path, str):
+            path = Path(path)
+
+        if path is None and self.project_config.root is None:
+            raise ValueError(
+                "Project doesn't have a path, please specify as an argument to write()"
+            )
+        if self.project_config.root is None:
+            self.project_config.root = path
+        path = self.project_config.root
+
+        if not path.exists():
+            actions.create_new_project(
+                path,
+                backend=self.backend,
+                name=self.project_config.name,
+                currency=self.project_config.currency,
+                locale=self.project_config.locale,
+            )
+
+        # assign paths where they're not present
+        self.model_data["tables"].assign_paths(
+            self.project_config.root / self.project_config.tables_path
+        )
+        self.model_data["metrics"].assign_paths(
+            self.project_config.root / self.project_config.metrics_path
+        )
+        self.model_data["unions"].assign_paths(
+            self.project_config.root / self.project_config.unions_path
+        )
+
+        self.model_data.flush()

@@ -398,14 +398,18 @@ def test_percent_basic(project: Project):
 
 def test_percent_of(project: Project):
     result = project.select("revenue.percent of (artist)").by("genre", "artist").df()
-    unique = result.groupby("genre").sum().iloc[:, 0].round(4).unique()
+    unique = (
+        result.groupby("genre")["revenue__percent_of_artist"].sum().round(4).unique()
+    )
     assert unique.size == 1
     assert unique[0] == 1.0
 
 
 def test_percent_within(project: Project):
     result = project.select("revenue.percent within (genre)").by("genre", "artist").df()
-    unique = result.groupby("genre").sum().iloc[:, 0].round(4).unique()
+    unique = (
+        result.groupby("genre")["revenue__percent_within_genre"].sum().round(4).unique()
+    )
     assert unique.size == 1
     assert unique[0] == 1.0
 

@@ -48,16 +48,16 @@ class YAMLMappedDict(UserDict):
 
     def flush(self):
         if self.path is not None:
-            return self.path.write_text(yaml.safe_dump(self.dict(), sort_keys=False))
-        if self.parent is not None:
-            self.parent.flush()
+            self.path.write_text(yaml.safe_dump(self.dict(), sort_keys=False))
+        for v in self.data.values():
+            if isinstance(v, YAMLMappedDict):
+                v.flush()
 
     def __setitem__(self, key: str, item):
         if isinstance(item, dict):
             item = YAMLMappedDict(item)
             item.parent = self
         self.data[key] = item
-        self.flush()
 
     def update_recursive(self, update: dict):
         _update_recursive(self, update)
@@ -70,3 +70,14 @@ class YAMLMappedDict(UserDict):
             else:
                 result[k] = v
         return result
+
+    def assign_paths(self, base_path: Path):
+        if base_path.is_dir():
+            for k, v in self.items():
+                if v.path is None:
+                    v.path = base_path / f"{k}.yml"
+        elif base_path.is_file():
+            if self.path is None:
+                self.path = base_path
+        else:
+            raise FileNotFoundError(f"{base_path} does not exist")

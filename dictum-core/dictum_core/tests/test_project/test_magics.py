@@ -25,7 +25,16 @@ def test_parse_table_with_pk_source():
     result = parse_shorthand_table("test[pk] src")
     assert result == Tree(
         "table_full",
-        [Tree("table", ["test"]), Tree("pk", ["pk"]), Tree("source", ["src"])],
+        [
+            Tree(
+                "table_def",
+                [
+                    Tree("table", ["test"]),
+                    Tree("pk", ["pk"]),
+                    Tree("source", ["src"]),
+                ],
+            )
+        ],
     )
 
 
@@ -34,9 +43,14 @@ def test_parse_table_with_pk_source_kv():
     assert result == Tree(
         "table_full",
         [
-            Tree("table", ["test"]),
-            Tree("pk", ["pk"]),
-            Tree("source", [{"src": "x", "y": "z"}]),
+            Tree(
+                "table_def",
+                [
+                    Tree("table", ["test"]),
+                    Tree("pk", ["pk"]),
+                    Tree("source", [{"src": "x", "y": "z"}]),
+                ],
+            )
         ],
     )
 
@@ -70,6 +84,7 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
     magics.table("invoice_items")
     magics.metric("revenue = sum(Quantity * UnitPrice) @ invoice_items")
     magics.format("currency")
+    project.write()
     assert (
         yaml.safe_load((tmp_path / "metrics" / "revenue.yml").read_text())["format"]
         == "currency"
@@ -97,6 +112,7 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
         "unique_paying_customers = countd(invoice.CustomerId) @ invoice_items"
     )
     magics.metric("arppu = $revenue / $unique_paying_customers as ARPPU")
+    project.write()
 
     assert (tmp_path / "project.yml").is_file()
     assert (tmp_path / "metrics" / "arppu.yml").is_file()
@@ -106,5 +122,6 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
         "arppu = $revenue / $unique_paying_customers "
         'as "Average Revenue per Paying User"'
     )
+    project.write()
     arppu = yaml.safe_load((tmp_path / "metrics" / "arppu.yml").read_text())
     assert arppu["name"] == "Average Revenue per Paying User"

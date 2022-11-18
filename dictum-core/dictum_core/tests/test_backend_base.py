@@ -2,7 +2,7 @@ from unittest import mock
 
 import pytest
 
-from dictum_core.backends.base import ExpressionTransformer
+from dictum_core.backends.base import ExpressionTransformer, Secret
 from dictum_core.backends.sql_alchemy import SQLAlchemyBackend
 
 
@@ -43,3 +43,14 @@ def test_sqlalchemy_override_default_schema():
     with mock.patch("dictum_core.backends.sql_alchemy.Table") as Table:
         backend.table("table", schema="override")
         assert Table.call_args[1]["schema"] == "override"
+
+
+def test_secret_parameters():
+    class SecretBackend(SQLAlchemyBackend):
+        def __init__(self, secret: Secret = "secret", x: int = 1):
+            super().__init__(secret=secret, x=x)
+
+    backend = SecretBackend()
+    parameters = backend.get_parameters()
+    assert parameters["x"] == 1
+    assert parameters["secret"] is None
