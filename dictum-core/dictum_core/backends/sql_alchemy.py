@@ -57,7 +57,11 @@ class ColumnTransformer(Transformer):
         super().__init__(visit_tokens=visit_tokens)
 
     def column(self, children: list):
-        identity, field = children
+        *path, field = children
+        if path == [None]:
+            identity = None
+        else:
+            identity = ".".join(path)
         return get_case_insensitive_column(self._tables[identity], field)
 
 
@@ -399,6 +403,7 @@ class SQLAlchemyBackend(Backend):
         return sqlparse.format(
             str(query.compile(bind=self.engine)),
             reindent=True,
+            wrap_after=60,
         )
 
     def execute(self, query: Select) -> DataFrame:

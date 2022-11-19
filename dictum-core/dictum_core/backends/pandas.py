@@ -21,7 +21,11 @@ class PandasColumnTransformer(Transformer):
         super().__init__(visit_tokens=visit_tokens)
 
     def column(self, children: list):
-        identity, column = children
+        *path, column = children
+        if path == [None]:
+            identity = None
+        else:
+            identity = ".".join(path)
         return self._tables[identity][column]
 
 

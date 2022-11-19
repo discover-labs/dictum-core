@@ -153,7 +153,7 @@ class Project:
 
     def query_graph(self, query: Query):
         computation = self.engine.get_computation(query)
-        return computation.graph()
+        return computation.graph(self.backend)
 
     def ql(self, query: str):
         return analyses.QlQuery(self, query)

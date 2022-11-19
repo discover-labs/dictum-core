@@ -91,23 +91,31 @@ class Operator:
             yield from dep.walk_graph()
         yield self
 
-    def graph(self, *, graph=None, format: str = "png"):
+    def create_graph_label(self, backend: Backend):
+        return self.__class__.__name__.replace("Operator", "")
+
+    def graph(self, backend: Backend, *, graph=None, format: str = "png"):
         import graphviz
 
         self_id = str(id(self))
-        self_cls = self.__class__.__name__.replace("Operator", "")
 
         if graph is None:
             graph = graphviz.Digraph(format=format, strict=True)
-            graph.node(self_id, label=self_cls)
+            graph.node(
+                self_id,
+                label=self.create_graph_label(backend),
+                shape=self.graphviz_node_shape,
+            )
 
         for dependency in self._dependencies:
             dep_id = str(id(dependency))
             graph.node(
-                dep_id, label=dependency.__class__.__name__.replace("Operator", "")
+                dep_id,
+                label=dependency.create_graph_label(backend),
+                shape=self.graphviz_node_shape,
             )
             graph.edge(dep_id, self_id)
-            dependency.graph(graph=graph)
+            dependency.graph(backend=backend, graph=graph)
 
         graph.graph_attr["rankdir"] = "LR"
         return graph
@@ -137,7 +145,6 @@ class QueryOperator(Operator):
         super().__init__()
 
     def execute(self, backend: Backend):
-        self.input.prepare()
         result = backend.compile_query(self.input)
         if self.limit is not None:
             result = backend.limit(result, self.limit)
