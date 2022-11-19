@@ -1,6 +1,6 @@
 %import .expr.expr -> expr
-%import .expr.IDENTIFIER -> IDENTIFIER
-%import .ql.identifier -> identifier
+%import .expr.IDENTIFIER -> IDENTIFIER  // strict identifier
+%import .ql.identifier -> identifier    // possibly quoted identifier
 
 id: IDENTIFIER
 type: IDENTIFIER
@@ -8,23 +8,28 @@ table: IDENTIFIER
 column: IDENTIFIER
 alias: identifier
 
-calculation: id "=" expr [ "@" table ] [ "::" type ] [ "AS"i alias ]
+dimension: id "=" expr [ "@" table ]  "::" type [ "AS"i alias ]
+
+// filters are only available for measures (metrics with a table)
+metric: id "=" expr [ "@" table [ filter ] ] [ "::" type ] [ "AS"i alias ]
+filter: "where" expr
+
 related: alias "|" column "->" table [ "." column ]
 related_standalone: table related
 
 format: IDENTIFIER | key_value+
 
-metric: "metric"i calculation
-dimension: "dimension"i calculation
+table_metric: "metric"i metric
+table_dimension: "dimension"i dimension
 table_format: "format"i format
 
 key_value: IDENTIFIER "=" identifier  // value can be quoted
 key_values: key_value+
 
-source: IDENTIFIER | key_values
 pk: "[" IDENTIFIER "]"
-
+source: IDENTIFIER | key_values
 table_def: table pk? source?
-table_full: table_def ( related | metric | dimension | table_format )*
+
+table_full: table_def ( related | table_metric | table_dimension | table_format )*
 
 %ignore /\s/

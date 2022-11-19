@@ -15,8 +15,9 @@ from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
 from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
-    parse_shorthand_calculation,
+    parse_shorthand_dimension,
     parse_shorthand_format,
+    parse_shorthand_metric,
     parse_shorthand_related,
     parse_shorthand_table,
 )
@@ -30,19 +31,23 @@ def _get_subtree_str(text: str, tree: Tree):
     return text[s:e]
 
 
-def _get_calculation_kwargs(definition: str) -> dict:
+def _get_calculation_kwargs(definition: str, tree: Tree) -> dict:
     result = {}
-    tree = parse_shorthand_calculation(definition)
+
+    id_ = next(tree.find_data("id")).children[0]
+    result["name"] = id_.replace("_", " ").title()
 
     expr = next(tree.find_data("expr"))
     result["expr"] = _get_subtree_str(definition, expr)
 
-    for ref in tree.find_data("table"):
-        result["table"] = ref.children[0]
     for ref in tree.find_data("type"):
         result["type"] = ref.children[0]
-    id_ = next(tree.find_data("id")).children[0]
-    result["name"] = id_.replace("_", " ").title()
+
+    for ref in tree.find_data("table"):
+        result["table"] = ref.children[0]
+
+    for ref in tree.find_data("filter"):
+        result["filter"] = _get_subtree_str(definition, ref)
 
     for ref in tree.find_data("alias"):
         result["name"] = ref.children[0]
@@ -256,12 +261,10 @@ class Project:
                 self.update_shorthand_related(f"{table} {str_shorthand}")
             elif item.data == "dimension":
                 self.update_shorthand_dimension(
-                    _get_subtree_str(definition, item.children[0]), table
+                    _get_subtree_str(definition, item), table
                 )
             elif item.data == "metric":
-                self.update_shorthand_metric(
-                    _get_subtree_str(definition, item.children[0]), table
-                )
+                self.update_shorthand_metric(_get_subtree_str(definition, item), table)
             elif item.data == "table_format":
                 self.update_shorthand_format(
                     _get_subtree_str(definition, item.children[0])
@@ -292,20 +295,22 @@ class Project:
         self.update_model(update)
 
     def update_shorthand_metric(self, definition: str, table: Optional[str] = None):
-        id_, calc = _get_calculation_kwargs(definition)
-        calc["table"] = calc.get("table", table)
-        update = {"metrics": {id_: calc}}
+        tree = parse_shorthand_metric(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        kwargs["table"] = kwargs.get("table", table)
+        update = {"metrics": {id_: kwargs}}
         self.update_model(update)
         self.latest_calc = self.model_data["metrics"][id_]
 
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
-        id_, calc = _get_calculation_kwargs(definition)
-        schema.Dimension.parse_obj(calc)  # validate before updating
+        tree = parse_shorthand_dimension(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        schema.Dimension.parse_obj(kwargs)  # validate before updating
         if table is None:
-            table = calc.pop("table", None)
+            table = kwargs.pop("table", None)
         if table is None:
             raise ValueError("Table is required, please specify with '@ table'")
-        update = {"tables": {table: {"dimensions": {id_: calc}}}}
+        update = {"tables": {table: {"dimensions": {id_: kwargs}}}}
         self.update_model(update)
 
         self.latest_calc = self.model_data["tables"][table]["dimensions"][id_]

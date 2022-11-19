@@ -233,3 +233,15 @@ def test_custom_calculation_format(project: Project):
             y=project.d.genre,
         )
     )
+
+
+def test_x2_type_time_unit(project: Project):
+    """Make sure that the x2 timeUnit is correctly handled (not added)"""
+    (
+        project.chart(project.m.revenue)
+        .mark_rect()
+        .encode(
+            x=project.d.invoice_date.datetrunc("year"),
+            x2=project.d.invoice_date.datetrunc("year"),
+        )
+    )._rendered_dict()

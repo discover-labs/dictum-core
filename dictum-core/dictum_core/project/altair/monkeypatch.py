@@ -297,7 +297,8 @@ def render_self(self):
                 fields = _update_nested(fields, channel.to_dict())
                 fields = filter_fields(channel.__class__, fields)
                 if (
-                    fields["type"] == "temporal"
+                    # type can be missing for x2, y2 etc.
+                    fields.get("type") == "temporal"
                     and "timeUnit" not in fields
                     and info.altair_time_unit is not None
                 ):

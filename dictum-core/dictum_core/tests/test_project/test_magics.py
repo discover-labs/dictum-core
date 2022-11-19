@@ -1,11 +1,15 @@
 from pathlib import Path
 
+import lark.exceptions
+import pytest
 import yaml
 from lark import Tree
 
 from dictum_core.project.magics.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
+    parse_shorthand_dimension,
     parse_shorthand_format,
+    parse_shorthand_metric,
     parse_shorthand_table,
 )
 from dictum_core.project.project import Project
@@ -62,6 +66,29 @@ def test_parse_table_with_source():
     ]
 
 
+@pytest.mark.parametrize("tbl", ["", " @ tbl ", " @ tbl where :dim = 'val' "])
+@pytest.mark.parametrize("type", ["", " :: int "])
+@pytest.mark.parametrize("alias", ["", " as z "])
+def test_parse_metric(tbl, type, alias):
+    """Basic tests for various combinations of metric parameters"""
+    definition = f"x = sum(y) {tbl} {type} {alias}"
+    parse_shorthand_metric(definition)
+
+
+@pytest.mark.parametrize("alias", ["", " as z "])
+@pytest.mark.parametrize("type", [" :: int "])
+@pytest.mark.parametrize("tbl", ["", " @ tbl "])
+def test_parse_dimension(tbl, type, alias):
+    """Basic tests for various combinations of dimension parameters"""
+    definition = f"x = y {tbl} {type} {alias}"
+    parse_shorthand_dimension(definition)
+
+
+def test_dimension_without_type_fails():
+    with pytest.raises(lark.exceptions.UnexpectedEOF):
+        parse_shorthand_dimension("x = y")
+
+
 def test_parse_table_with_related():
     result = parse_shorthand_table("test related | column -> other.column")
     _, related = result.children
@@ -78,7 +105,31 @@ def test_parse_format_kv():
     assert result == Tree("format", [("kind", "currency"), ("currency", "USD")])
 
 
-def test_create_project_from_scratch(tmp_path: Path, project: Project):
+def test_standalone_table(tmp_path: Path, project):
+    project = Project.new(backend=project.backend, path=tmp_path)
+    magics = ProjectMagics(project)
+    magics.table("genres")
+
+
+@pytest.fixture(scope="function")
+def empty():
+    return Project.example("empty")
+
+
+def test_project_create_table(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    assert "invoice_items" in empty.model_data["tables"]
+
+
+def test_project_create_metric_with_filter(empty: Project):
+    empty.update_shorthand_table("tbl")
+    empty.update_shorthand_metric("x = sum(x * y) @ tbl where z > 0")
+    assert "x" in empty.model_data["metrics"]
+    assert "filter" in empty.model_data["metrics"]["x"]
+    assert empty.model_data["metrics"]["x"]["filter"] == "z > 0"
+
+
+def test_project_create_from_scratch_write(tmp_path: Path, project: Project):
     project = Project.new(backend=project.backend, path=tmp_path)
     magics = ProjectMagics(project)
     magics.table("invoice_items")
@@ -89,7 +140,6 @@ def test_create_project_from_scratch(tmp_path: Path, project: Project):
         yaml.safe_load((tmp_path / "metrics" / "revenue.yml").read_text())["format"]
         == "currency"
     )
-
     magics.table("invoices")
     magics.related("invoice_items invoice | InvoiceId -> invoices.InvoiceId")
     magics.dimension("date = InvoiceDate @ invoices ::date")
