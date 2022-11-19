@@ -50,15 +50,6 @@ def _get_calculation_kwargs(definition: str) -> dict:
     return id_, result
 
 
-def _update_nested(d: dict, u: dict):
-    for k, v in u.items():
-        if isinstance(v, dict):
-            d[k] = _update_nested(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
-
-
 class Project:
     def __init__(
         self,

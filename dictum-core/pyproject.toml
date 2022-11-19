@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "dictum-core"
-version = "0.1.10"
+version = "0.1.11"
 description = "Core library for Dictum"
 authors = ["Mikhail Akimov"]
 

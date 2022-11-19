@@ -1,4 +1,5 @@
 from collections import UserDict
+from collections.abc import MutableMapping
 from itertools import chain
 from pathlib import Path
 
@@ -7,7 +8,7 @@ import yaml
 
 def _update_recursive(d, u):
     for k, v in u.items():
-        if isinstance(v, dict):
+        if isinstance(v, dict) and isinstance(d.get(k, {}), MutableMapping):
             d[k] = _update_recursive(d.get(k, {}), v)
         else:
             d[k] = v
@@ -48,7 +49,9 @@ class YAMLMappedDict(UserDict):
 
     def flush(self):
         if self.path is not None:
-            self.path.write_text(yaml.safe_dump(self.dict(), sort_keys=False))
+            self.path.write_text(
+                yaml.safe_dump(self.dict(), sort_keys=False, allow_unicode=True)
+            )
         for v in self.data.values():
             if isinstance(v, YAMLMappedDict):
                 v.flush()
