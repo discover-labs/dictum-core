@@ -101,19 +101,11 @@ class Operator:
 
         if graph is None:
             graph = graphviz.Digraph(format=format, strict=True)
-            graph.node(
-                self_id,
-                label=self.create_graph_label(backend),
-                shape=self.graphviz_node_shape,
-            )
+            graph.node(self_id, label=self.create_graph_label(backend))
 
         for dependency in self._dependencies:
             dep_id = str(id(dependency))
-            graph.node(
-                dep_id,
-                label=dependency.create_graph_label(backend),
-                shape=self.graphviz_node_shape,
-            )
+            graph.node(dep_id, label=dependency.create_graph_label(backend))
             graph.edge(dep_id, self_id)
             dependency.graph(backend=backend, graph=graph)
 
