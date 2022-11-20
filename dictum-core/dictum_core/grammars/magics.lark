@@ -8,10 +8,11 @@ table: IDENTIFIER
 column: IDENTIFIER
 alias: identifier
 
-dimension: id "=" expr [ "@" table ]  "::" type [ "AS"i alias ]
+properties: key_values  // props for a calculation
+dimension: id "=" expr [ "@" table ]  "::" type [ "AS"i alias ] [ "|" properties ]
 
 // filters are only available for measures (metrics with a table)
-metric: id "=" expr [ "@" table [ filter ] ] [ "::" type ] [ "AS"i alias ]
+metric: id "=" expr [ "@" table ] [ filter ] [ "::" type ] [ "AS"i alias ] [ "|" properties ]
 filter: "where" expr
 
 related: alias "|" column "->" table [ "." column ]

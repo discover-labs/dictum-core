@@ -63,20 +63,23 @@ class ProjectMagics(Magics):
         """Create a new table for the current project."""
         if cell is None:
             cell = ""
-        definition = f"{line} {cell}"
-        self.project.update_shorthand_table(definition)
+        self.project.update_shorthand_table(f"{line} {cell}")
 
     @line_magic
     def related(self, line: str):
         self.project.update_shorthand_related(line)
 
-    @line_magic
-    def dimension(self, line: str):
-        self.project.update_shorthand_dimension(line)
+    @line_cell_magic
+    def dimension(self, line: str, cell=None):
+        if cell is None:
+            cell = ""
+        self.project.update_shorthand_dimension(f"{line} {cell}")
 
-    @line_magic
-    def metric(self, line: str):
-        self.project.update_shorthand_metric(line)
+    @line_cell_magic
+    def metric(self, line: str, cell=None):
+        if cell is None:
+            cell = ""
+        self.project.update_shorthand_metric(f"{line} {cell}")
 
     @line_magic
     def format(self, line: str):

@@ -129,6 +129,17 @@ def test_project_create_metric_with_filter(empty: Project):
     assert empty.model_data["metrics"]["x"]["filter"] == "z > 0"
 
 
+def test_metric_properties(empty: Project):
+    empty.update_shorthand_table("tbl")
+    empty.update_shorthand_dimension("d = d @ tbl ::date")
+    empty.update_shorthand_metric(
+        'x = sum(x * y) @ tbl | time=d name="something something"'
+    )
+    assert "x" in empty.model.metrics
+    assert empty.model.metrics["x"].name == "something something"
+    assert len(empty.model.metrics["x"].generic_time_dimensions) > 0
+
+
 def test_project_create_from_scratch_write(tmp_path: Path, project: Project):
     project = Project.new(backend=project.backend, path=tmp_path)
     magics = ProjectMagics(project)

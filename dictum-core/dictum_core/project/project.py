@@ -52,6 +52,9 @@ def _get_calculation_kwargs(definition: str, tree: Tree) -> dict:
     for ref in tree.find_data("alias"):
         result["name"] = ref.children[0]
 
+    for ref in tree.find_data("properties"):
+        result.update(ref.children[0])
+
     return id_, result
 
 
