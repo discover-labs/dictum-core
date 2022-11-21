@@ -9,6 +9,7 @@ from lark import Tree
 from dictum_core import schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
+from dictum_core.exceptions import MissingPathError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
 from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
@@ -124,7 +125,7 @@ class Project:
         if isinstance(path, str):
             path = Path(path)
         if not path.exists():
-            raise FileNotFoundError(f"Path {path} does not exist")
+            raise MissingPathError(path)
 
         project_config = schema.Project.load(path)
 
@@ -133,6 +134,10 @@ class Project:
         model_data["description"] = project_config.description
         model_data["locale"] = project_config.locale
         model_data["currency"] = project_config.currency
+
+        tables_path = path / project_config.tables_path
+        if not tables_path.is_dir():
+            raise MissingPathError(path)
         model_data["tables"] = YAMLMappedDict.from_path(
             path / project_config.tables_path
         )

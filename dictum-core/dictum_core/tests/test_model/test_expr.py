@@ -1,6 +1,7 @@
 import pytest
 from lark import ParseError, Token, Tree, UnexpectedToken
 
+from dictum_core.exceptions import MixedExpressionError
 from dictum_core.model.expr.introspection import get_expr_kind, get_expr_total_function
 from dictum_core.model.expr.parser import parse_expr, parser
 
@@ -229,13 +230,13 @@ def test_expr_kind():
 
 
 def test_expr_kind_invalid():
-    with pytest.raises(ValueError, match="error in expression"):
+    with pytest.raises(MixedExpressionError):
         get_expr_kind(parse_expr("sum(col) + col"))
-    with pytest.raises(ValueError, match="error in expression"):
+    with pytest.raises(MixedExpressionError):
         get_expr_kind(parse_expr("case when col = 1 then sum(col) end"))
-    with pytest.raises(ValueError, match="error in expression"):
+    with pytest.raises(MixedExpressionError):
         get_expr_kind(parse_expr("case when col = 1 then sum(col) end"))
-    with pytest.raises(ValueError, match="error in expression"):
+    with pytest.raises(MixedExpressionError):
         get_expr_kind(parse_expr("col in (sum(col), 1, 2)"))
 
 

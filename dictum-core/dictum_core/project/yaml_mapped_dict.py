@@ -5,6 +5,8 @@ from pathlib import Path
 
 import yaml
 
+from dictum_core.exceptions import DuplicateFileError, MissingPathError
+
 
 def _update_recursive(d, u):
     for k, v in u.items():
@@ -33,6 +35,8 @@ class YAMLMappedDict(UserDict):
 
     @classmethod
     def from_path(cls, path: Path):
+        if not path.exists():
+            raise MissingPathError(path)
         if path.is_file() and path.suffix in cls.file_extensions:
             value = yaml.safe_load(path.read_text())
             result = cls(value)
@@ -40,10 +44,16 @@ class YAMLMappedDict(UserDict):
             return result
         if path.is_dir():
             items = {}
+            ids = set()
             for subpath in chain(
                 *(path.glob(f"**/*{ext}") for ext in cls.file_extensions)
             ):
                 key = subpath.stem
+                if key in ids:
+                    raise DuplicateFileError(
+                        f"Duplicate filenames at {path}: {subpath.name}"
+                    )
+                ids.add(key)
                 items[key] = cls.from_path(subpath)
             return cls(items)
 

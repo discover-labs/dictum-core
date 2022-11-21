@@ -1,0 +1,5 @@
+name: Music Tracks Sold
+expr: sum(Quantity)
+table: invoice_items
+filter: :music
+time: invoice_date

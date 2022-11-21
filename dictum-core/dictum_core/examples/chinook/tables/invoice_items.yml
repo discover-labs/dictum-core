@@ -8,6 +8,12 @@ related:
     table: tracks
     foreign_key: TrackId
 
+measures:
+  test_arppu:
+    name: ARPPU as a measure for testing
+    description: Used for checking that measure references resolve correctly
+    expr: $revenue / countd(invoice.CustomerId)
+
 dimensions:
   order_customer_country:
     name: Order's Customer Country

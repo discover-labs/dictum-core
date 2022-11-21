@@ -105,7 +105,7 @@ class AggregateQueryBuilder:
             result.add_filter_expr(filter.expr)
 
         if measure.filter:
-            result.add_filter_expr(measure.filter)
+            result.add_filter_expr(measure.filter.expr)
 
         result.add_aggregate(
             column=Column(name=measure.id, expr=measure.expr, type=measure.type)

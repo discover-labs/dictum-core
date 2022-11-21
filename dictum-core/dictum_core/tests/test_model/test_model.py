@@ -33,7 +33,7 @@ def test_dimension_same_table_as_measures(chinook: Model):
 
 
 def test_resolve_measures(chinook: Model):
-    assert chinook.measures["arppu"].expr == Tree(
+    assert chinook.measures["test_arppu"].expr == Tree(
         "expr",
         [
             Tree(

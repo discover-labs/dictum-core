@@ -1,5 +1,3 @@
 name: Percentage of Music Sold
-expr: count(case when :music then 1 end) / $items_sold
-table: invoice_items
+expr: $music_tracks_sold / $items_sold
 format: percent
-time: invoice_date

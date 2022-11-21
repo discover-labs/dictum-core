@@ -4,6 +4,8 @@ from enum import Enum
 from lark import Transformer, Tree
 from lark.exceptions import VisitError
 
+from dictum_core.exceptions import AggregateFunctionArgumentError, MixedExpressionError
+
 
 class AbstractExprTransformer(Transformer, ABC):
     @abstractmethod
@@ -150,7 +152,9 @@ def _infer_kind(items: list):
         return ExprKind.aggregate
 
     if items & {ExprKind.aggregate, ExprKind.column}:
-        raise ValueError("Mixing aggregates and non-aggregates in expression")
+        raise MixedExpressionError(
+            "mixed aggregate and non-aggregate parts in expression"
+        )
 
     raise ValueError(f"Unknown combination of kinds: {items}")
 
@@ -212,9 +216,9 @@ class ExprKindTransformer(AbstractExprTransformer):
         fn, *args = children
         if fn in aggregate_functions:
             if args and args[0] == ExprKind.aggregate:
-                raise ValueError(
-                    f"Aggregate function {fn} expects a scalar "
-                    "or a column expression argument"
+                raise AggregateFunctionArgumentError(
+                    f"aggregate function {fn} expects a scalar "
+                    "or a column expression argument, got aggregate"
                 )
             return ExprKind.aggregate
         return _infer_kind(args)
@@ -255,7 +259,7 @@ def get_expr_kind(expr: Tree) -> ExprKind:
     try:
         return expr_kind_transformer.transform(expr)
     except VisitError as e:
-        raise ValueError(f"error in expression {e.obj.data}: {e.orig_exc}")
+        raise e.orig_exc
 
 
 class TotalFunctionExprTransformer(Transformer):

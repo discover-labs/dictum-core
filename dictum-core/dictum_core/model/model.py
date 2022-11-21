@@ -7,12 +7,14 @@ from dictum_core.model.calculations import (
     Calculation,
     Dimension,
     DimensionsUnion,
+    Expression,
     Measure,
     Metric,
     TableCalculation,
 )
 from dictum_core.model.scalar import transforms as scalar_transforms
 from dictum_core.model.table import Table, TableFilter
+from dictum_core.model.time import GenericTimeDimension
 from dictum_core.model.time import dimensions as time_dimensions
 from dictum_core.model.types import resolve_type
 
@@ -36,6 +38,11 @@ class Model:
 
     @classmethod
     def from_config(cls, model: schema.Model):
+        from dictum_core.model.checks import check_model
+        from dictum_core.schema.model.checks import check_model_config
+
+        check_model_config(model)
+
         obj = cls(name=model.name)
         obj.description = model.description
         obj.locale = model.locale
@@ -125,6 +132,7 @@ class Model:
         for id_, time_dimension in time_dimensions.items():
             obj.dimensions[id_] = time_dimension(locale=obj.locale)
 
+        check_model(obj)
         return obj
 
     def add_table(
@@ -333,6 +341,25 @@ class Model:
                     "parent": _id,
                     "name": f"{table}.*",
                 }
+
+    @property
+    def expressions(self) -> List[Expression]:
+        """List all child objects that are instances of Expression.
+        Used in checks.
+        """
+        yield from self.metrics.values()
+        yield from (
+            d
+            for d in self.dimensions.values()
+            if not isinstance(d, GenericTimeDimension)
+            and not isinstance(d, DimensionsUnion)
+        )
+        for table in self.tables.values():
+            yield from table.filters
+        for measure in self.measures.values():
+            yield measure
+            if measure.filter is not None:
+                yield measure.filter
 
     # def suggest_metrics(self, query: schema.Query) -> List[Measure]:
     #     """Suggest a list of possible metrics based on a query.
