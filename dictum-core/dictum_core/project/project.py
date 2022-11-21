@@ -209,7 +209,11 @@ class Project:
             method invocation.
         """
         example = importlib.import_module(f"dictum_core.examples.{name}.generate")
-        return example.generate()
+        result: Project = example.generate()
+        # prevent users from changing examples
+        result.project_config.root = None
+        result.model_data = YAMLMappedDict(result.model_data.dict())
+        return result
 
     def describe(self) -> pd.DataFrame:
         """Show project's metrics and dimensions and their compatibility. If a metric
@@ -334,9 +338,16 @@ class Project:
         self.update_model({})  # trigger model update
 
     def update_model(self, update: dict):
-        self.model_data.update_recursive(update)
-        model_config = schema.Model.parse_obj(self.model_data)
-        self.model = Model.from_config(model_config)
+        # avoid updating model_data until model is checked
+        new = self.model_data.copy()
+        new.update_recursive(update)
+
+        model_config = schema.Model.parse_obj(new)
+        self.model = Model.from_config(model_config)  # model checks happen here
+        # we're ok, can update model data
+        self.model_data = new
+
+        # do the rest of the stuff
         self.engine = Engine(self.model)
         self.metrics = ProjectMetrics(self)
         self.dimensions = ProjectDimensions(self)

@@ -94,3 +94,6 @@ class YAMLMappedDict(UserDict):
                 self.path = base_path
         else:
             raise FileNotFoundError(f"{base_path} does not exist")
+
+    def copy(self) -> "YAMLMappedDict":
+        return YAMLMappedDict(self.dict())
