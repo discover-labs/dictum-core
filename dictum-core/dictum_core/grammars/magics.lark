@@ -9,28 +9,28 @@ column: IDENTIFIER
 alias: identifier
 
 properties: key_values  // props for a calculation
-dimension: id "=" expr [ "@" table ]  "::" type [ "AS"i alias ] [ "|" properties ]
+dimension: [ table "." ] id "=" expr "::" type [ "AS"i alias ] [ properties ]
 
 // filters are only available for measures (metrics with a table)
-metric: id "=" expr [ "@" table ] [ filter ] [ "::" type ] [ "AS"i alias ] [ "|" properties ]
+metric: [ table "." ] id "=" expr [ filter ] [ "::" type ] [ "AS"i alias ] [ properties ]
 filter: "where" expr
 
-related: alias "|" column "->" table [ "." column ]
-related_standalone: table related
+related: [ table "." ] alias "=" column "->" table [ "." column ]
 
 format: IDENTIFIER | key_value+
 
 table_metric: "metric"i metric
 table_dimension: "dimension"i dimension
 table_format: "format"i format
+table_related: "related"i related
 
-key_value: IDENTIFIER "=" identifier  // value can be quoted
-key_values: key_value+
+key_value: IDENTIFIER "=" ( identifier | key_values )  // value can be quoted or nested
+key_values: "{" key_value+ "}"
 
 pk: "[" IDENTIFIER "]"
 source: IDENTIFIER | key_values
 table_def: table pk? source?
 
-table_full: table_def ( related | table_metric | table_dimension | table_format )*
+table_full: table_def ( table_related | table_metric | table_dimension | table_format )*
 
 %ignore /\s/

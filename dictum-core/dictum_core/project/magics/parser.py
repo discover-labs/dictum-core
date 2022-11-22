@@ -1,10 +1,14 @@
+from functools import wraps
+
 from lark import Lark, Token, Transformer, Tree
+from lark.exceptions import UnexpectedInput
 
 from dictum_core import grammars
+from dictum_core.exceptions import ShorthandSyntaxError
 
 grammars = grammars.__file__
 
-related_parser = Lark.open("magics.lark", rel_to=grammars, start="related_standalone")
+related_parser = Lark.open("magics.lark", rel_to=grammars, start="related")
 metric_parser = Lark.open(
     "magics.lark", rel_to=grammars, start="metric", propagate_positions=True
 )
@@ -42,6 +46,9 @@ class Preprocessor(Transformer):
     def table_dimension(self, children: list):
         return children[0]
 
+    def table_related(self, children: list):
+        return children[0]
+
     def filter(self, children: list):
         """Inline expr node directly into filter"""
         return Tree("filter", children[0].children, meta=children[0].meta)
@@ -50,21 +57,37 @@ class Preprocessor(Transformer):
 preprocessor = Preprocessor()
 
 
+def catch_syntax_errors(fn: callable):
+    @wraps(fn)
+    def wrapped(definition: str):
+        try:
+            return fn(definition)
+        except UnexpectedInput as e:
+            raise ShorthandSyntaxError(e, definition)
+
+    return wrapped
+
+
+@catch_syntax_errors
 def parse_shorthand_table(definition: str) -> Tree:
     return preprocessor.transform(table_parser.parse(definition))
 
 
+@catch_syntax_errors
 def parse_shorthand_metric(definition: str) -> Tree:
     return preprocessor.transform(metric_parser.parse(definition))
 
 
+@catch_syntax_errors
 def parse_shorthand_dimension(definition: str) -> Tree:
     return preprocessor.transform(dimension_parser.parse(definition))
 
 
+@catch_syntax_errors
 def parse_shorthand_related(definition: str) -> Tree:
     return preprocessor.transform(related_parser.parse(definition))
 
 
+@catch_syntax_errors
 def parse_shorthand_format(definition: str) -> Tree:
     return preprocessor.transform(format_parser.parse(definition))

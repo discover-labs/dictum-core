@@ -164,3 +164,25 @@ class InvalidMeasureError(ReferenceError):
 
 class CircularReferenceError(ReferenceError):
     """When calculations reference each other, and so can't be resolved"""
+
+
+class ShorthandError(ModelError):
+    """Problems with the interactive shorthand syntax for Jupyter"""
+
+
+class ShorthandSyntaxError(ShorthandError):
+    """Nicer syntax errors for shorthands"""
+
+    def __init__(self, lark_exc, definition, *args):
+        base_text = f"\n{lark_exc.__class__.__name__} error in expression: "
+        context = textwrap.indent(
+            lark_exc.get_context(definition),
+            prefix=" " * (len(base_text) - 1),
+            predicate=lambda x: "^" in x,
+        )
+        self.lark_exc = lark_exc
+        super().__init__(f"{base_text}{context}", *args)
+
+
+class MissingShorthandTableError(ShorthandError):
+    """When a shorthand requires a table, but none is provided"""

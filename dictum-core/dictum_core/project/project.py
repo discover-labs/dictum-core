@@ -9,7 +9,7 @@ from lark import Tree
 from dictum_core import schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
-from dictum_core.exceptions import MissingPathError
+from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
 from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
@@ -270,7 +270,7 @@ class Project:
         for item in items:
             if item.data == "related":
                 str_shorthand = _get_subtree_str(definition, item)
-                self.update_shorthand_related(f"{table} {str_shorthand}")
+                self.update_shorthand_related(f"{table}.{str_shorthand}")
             elif item.data == "dimension":
                 self.update_shorthand_dimension(
                     _get_subtree_str(definition, item), table
@@ -284,8 +284,17 @@ class Project:
 
     def update_shorthand_related(self, definition: str):
         tree = parse_shorthand_related(definition)
-        target, parent = list(t.children[0] for t in tree.find_data("table"))
+        tables = tree.find_data("table")
+        parent = next(tables).children[0]
+        target = next(tables, None)
         alias = next(tree.find_data("alias")).children[0]
+        if target is None:
+            raise MissingShorthandTableError(
+                f"\nTable is required for standalone related shorthand: table.{alias}\n"
+                "                                                    ^^^^^"
+            )
+        target = target.children[0]
+        # parent, target = list(t.children[0] for t in tree.find_data("table"))
         columns = list(c.children[0] for c in tree.find_data("column"))
         foreign_key = columns[0]
         related_key = None
