@@ -121,6 +121,15 @@ def _check_missing_metric_time_dimensions(model: Model):
                 )
 
 
+def _check_metrics_table_exists(model: Model):
+    for id_, metric in model.metrics.items():
+        if metric.table is not None:
+            if metric.table not in model.tables:
+                raise MissingMetricTableError(
+                    f"Table {metric.table} specified in metric {id_} does not exist"
+                )
+
+
 def check_model_config(model: Model):
     """Check that the model data is valid and internally consistent."""
     _check_model_ids(model)
@@ -128,4 +137,5 @@ def check_model_config(model: Model):
     _check_duplicate_dimensions(model)
     _check_missing_unions(model)
     _check_metric_table_consistency(model)
+    _check_metrics_table_exists(model)
     _check_missing_metric_time_dimensions(model)

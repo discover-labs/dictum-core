@@ -163,7 +163,7 @@ class Project:
         computation = self.engine.get_computation(query)
         return computation.graph(self.backend)
 
-    def ql(self, query: str):
+    def ql(self, query: str) -> analyses.QlQuery:
         return analyses.QlQuery(self, query)
 
     def select(self, *metrics: str) -> "analyses.Select":
@@ -244,6 +244,10 @@ class Project:
         ip = get_ipython()
         if ip is not None:
             ip.register_magics(ProjectMagics(project=self, shell=ip))
+            print(
+                r"Magics %ql, %table, %metric, %dimension are registered and bound "
+                f"to project {self.project_config.name}"
+            )
 
     def _repr_html_(self):
         template = environment.get_template("project.html.j2")

@@ -26,10 +26,6 @@ class ModelError(DictumError):
     """Problems with the model"""
 
 
-class QueryError(DictumError):
-    """Problems with the Query object"""
-
-
 class InvalidIDError(ModelError):
     """When an object's ID is invalid:
     - not a valid Python ID
@@ -73,6 +69,10 @@ class MissingRelatedKeyError(RelatedTableError):
     """When related_key is not specified and the related table doesn't
     have a primary_key specified
     """
+
+
+class MissingPrimaryKeyError(TableError):
+    """When a table requires a primary_key"""
 
 
 class ExpressionError(ModelError):
@@ -186,3 +186,39 @@ class ShorthandSyntaxError(ShorthandError):
 
 class MissingShorthandTableError(ShorthandError):
     """When a shorthand requires a table, but none is provided"""
+
+
+class QueryError(DictumError):
+    """Problems with the Query object"""
+
+
+class MissingQueryMetricError(QueryError):
+    """When requested metric doesn't exist"""
+
+
+class MissingQueryDimensionError(QueryError):
+    """When requested dimension doesn't exist"""
+
+
+class MissingScalarTransformError(QueryError):
+    """When requested scalar transform doesn't exist"""
+
+
+class MissingTableTransformError(QueryError):
+    """When requested table transform doesn't exist"""
+
+
+class MissingTableTransformDimensionError(QueryError):
+    """When transforms listed in of/within are not present in the query"""
+
+
+class ScalarTransformTypeError(QueryError):
+    """When there's funky business with scalar transform input types"""
+
+
+class DimensionUnavailableError(QueryError):
+    """When dimension exists, but can't be joined"""
+
+
+class DuplicateColumnError(QueryError):
+    """When a query is requesting duplicate columns in the output"""

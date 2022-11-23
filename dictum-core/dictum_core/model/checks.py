@@ -1,6 +1,4 @@
-from graphlib import TopologicalSorter
 from itertools import chain
-from typing import List
 
 from lark.exceptions import UnexpectedInput
 
@@ -14,6 +12,7 @@ from dictum_core.exceptions import (
     MissingAggregationError,
     MissingDimensionError,
     MissingMeasureError,
+    MissingPrimaryKeyError,
     NonAggregateMeasureError,
     UnknownFunctionError,
 )
@@ -24,39 +23,7 @@ from dictum_core.model.expr.introspection import (
     get_expr_kind,
 )
 from dictum_core.model.model import Model
-
-
-class OrderedCheckCaller:
-    """Allows the user to specify dependencies for each function
-    and then calls all functions with the same arguments, but in the topological
-    order.
-    """
-
-    def __init__(self) -> None:
-        self.graph = {}
-        self.fns = {}
-
-    def register(self, fn: callable):
-        self.fns[fn.__name__] = fn
-        self.graph.setdefault(fn.__name__, set())
-
-    def depends_on(self, *dependencies):
-        def decorator(fn):
-            self.register(fn)
-            for dep in dependencies:
-                self.register(dep)
-                self.graph[fn.__name__].add(dep.__name__)
-            return fn
-
-        return decorator
-
-    def static_order(self) -> List[str]:
-        return TopologicalSorter(self.graph).static_order()
-
-    def __call__(self, *args, **kwargs):
-        for k in self.static_order():
-            self.fns[k](*args, **kwargs)
-
+from dictum_core.ordered_check_caller import OrderedCheckCaller
 
 check_model = OrderedCheckCaller()
 
@@ -270,4 +237,19 @@ def _check_measures_dont_reference_filtered_measures(model: Model):
                 raise FilteredMeasureReferenceError(
                     f"{measure} references a filtered {refd}, "
                     "filtered measures are not allowed in measure references"
+                )
+
+
+@check_model.depends_on(
+    _check_expr_parse, _check_known_calculations, _check_calculation_kinds
+)
+def _check_aggregate_dimension_table_has_pk(model: Model):
+    for dimension in model.dimensions.values():
+        if not isinstance(dimension, Expression):
+            continue
+        for _ in dimension.parsed_expr.find_data("measure"):
+            if dimension.table.primary_key is None:
+                raise MissingPrimaryKeyError(
+                    f"{dimension} is aggregate, so its' parent {dimension.table} "
+                    "requires a primary_key"
                 )

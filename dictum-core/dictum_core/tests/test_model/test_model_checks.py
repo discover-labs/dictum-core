@@ -11,6 +11,7 @@ from dictum_core.exceptions import (
     MissingAggregationError,
     MissingDimensionError,
     MissingMeasureError,
+    MissingPrimaryKeyError,
     MixedExpressionError,
     NonAggregateMeasureError,
     UnknownFunctionError,
@@ -34,6 +35,7 @@ def model() -> Model:
             "tables": {
                 "t1": {
                     "source": "t1",
+                    "primary_key": "pk",
                     "measures": {
                         "me1": {"name": "me1", "expr": "sum(col)"},
                         "me3": {"name": "me3", "expr": "sum(col)"},
@@ -277,4 +279,10 @@ def test_check_measures_use_aggregate_functions(model: Model):
 def test_check_measures_dont_reference_filtered_measures(model: Model):
     model.measures["me1"].str_expr = "$m1 / count()"
     with pytest.raises(FilteredMeasureReferenceError):
+        check_model(model)
+
+
+def test_check_aggregate_dimension_table_has_pk(model: Model):
+    model.tables["t1"].primary_key = None
+    with pytest.raises(MissingPrimaryKeyError):
         check_model(model)
