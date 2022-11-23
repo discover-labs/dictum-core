@@ -1,39 +1,23 @@
-import os
-from pathlib import Path
-
 import pytest
 
-from dictum_core.examples import chinook
-
-chinook_path = Path(chinook.__file__).parent
+from dictum_core import Project
 
 
 @pytest.fixture(scope="session")
-def backend():
-    from dictum_core.examples.chinook.generate import generate
-
-    yield generate().backend
+def project():
+    return Project.example("chinook")
 
 
 @pytest.fixture(scope="session")
-def project(backend):
-    from dictum_core import Project
-
-    project = Project.example("chinook")
-    project.backend = backend
-    yield project
+def backend(project: Project):
+    return project.backend
 
 
 @pytest.fixture(scope="session")
-def chinook():
-    os.environ["CHINOOK_DATABASE"] = ""
-    from dictum_core import Project
-
-    return Project.example("chinook").model
+def chinook(project: Project):
+    return project.model
 
 
 @pytest.fixture(scope="session")
-def engine(chinook):
-    from dictum_core.engine import Engine
-
-    return Engine(chinook)
+def engine(project: Project):
+    return project.engine

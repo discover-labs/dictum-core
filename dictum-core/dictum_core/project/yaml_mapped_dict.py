@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from dictum_core.exceptions import DuplicateFileError, MissingPathError
+from dictum_core.exceptions import DuplicateFileError
 
 
 def _update_recursive(d, u):
@@ -36,7 +36,7 @@ class YAMLMappedDict(UserDict):
     @classmethod
     def from_path(cls, path: Path):
         if not path.exists():
-            raise MissingPathError(path)
+            return {}
         if path.is_file() and path.suffix in cls.file_extensions:
             value = yaml.safe_load(path.read_text())
             result = cls(value)

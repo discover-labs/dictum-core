@@ -1,4 +1,3 @@
-import importlib
 from pathlib import Path
 from typing import Optional, Union
 
@@ -6,7 +5,7 @@ import altair as alt
 import pandas as pd
 from lark import Tree
 
-from dictum_core import schema
+from dictum_core import examples, schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
 from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
@@ -135,9 +134,6 @@ class Project:
         model_data["locale"] = project_config.locale
         model_data["currency"] = project_config.currency
 
-        tables_path = path / project_config.tables_path
-        if not tables_path.is_dir():
-            raise MissingPathError(path)
         model_data["tables"] = YAMLMappedDict.from_path(
             path / project_config.tables_path
         )
@@ -208,8 +204,10 @@ class Project:
             CachedProject: same as ``Project``, but won't read the model config at each
             method invocation.
         """
-        example = importlib.import_module(f"dictum_core.examples.{name}.generate")
-        result: Project = example.generate()
+        path = Path(examples.__file__).parent / name
+        if not path.is_dir():
+            raise FileNotFoundError(f"Example project {name} does not exist")
+        result = Project.from_path(path)
         # prevent users from changing examples
         result.project_config.root = None
         result.model_data = YAMLMappedDict(result.model_data.dict())
@@ -263,7 +261,7 @@ class Project:
             source = source.children[0]
         if source is None:
             source = table
-        data = {"id": table, "source": source}
+        data = {"source": source}
 
         pk = next(table_def.find_data("pk"), None)
         if pk is not None:
