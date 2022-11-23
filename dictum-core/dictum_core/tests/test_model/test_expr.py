@@ -249,3 +249,11 @@ def test_expr_total_function():
     assert get_expr_total_function(parse_expr("avg(col)")) is None
     assert get_expr_total_function(parse_expr("countd(col)")) is None
     assert get_expr_total_function(parse_expr("sum(col) + 1")) is None
+
+
+def test_count_no_args():
+    assert (
+        parse_expr("count()")
+        == parse_expr("count(*)")
+        == Tree("expr", [Tree("call", ["count"])])
+    )

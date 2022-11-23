@@ -25,7 +25,8 @@ ARG: "@"  // argument for transforms and filters
 ?ref: column | measure | dimension | ARG
 
 // Function call
-call: IDENTIFIER "(" [ op ("," op)* ] ")"
+_call_args: ( op ("," op)* ) | "*"
+call: IDENTIFIER "(" _call_args? ")"
 
 ?paren: "(" op ")"  // just parentheses
 
