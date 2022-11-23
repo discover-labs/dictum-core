@@ -33,6 +33,11 @@ def test_multiple_anchors_by(project: Project, engine):
     assert result.shape == (25, 3)
 
 
+def test_select_aggregate_dimension(project: Project):
+    result = project.select("revenue").by("track_revenue").df()
+    assert result.shape == (4, 2)
+
+
 def test_groupby(project: Project):
     result = (
         project.select(project.metrics.revenue, project.metrics.track_count)

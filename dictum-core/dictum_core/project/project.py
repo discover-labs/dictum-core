@@ -9,14 +9,16 @@ from lark import Tree
 from dictum_core import schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
+from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
 from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
 from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
-    parse_shorthand_calculation,
+    parse_shorthand_dimension,
     parse_shorthand_format,
+    parse_shorthand_metric,
     parse_shorthand_related,
     parse_shorthand_table,
 )
@@ -30,33 +32,31 @@ def _get_subtree_str(text: str, tree: Tree):
     return text[s:e]
 
 
-def _get_calculation_kwargs(definition: str) -> dict:
+def _get_calculation_kwargs(definition: str, tree: Tree) -> dict:
     result = {}
-    tree = parse_shorthand_calculation(definition)
+
+    id_ = next(tree.find_data("id")).children[0]
+    result["name"] = id_.replace("_", " ").title()
 
     expr = next(tree.find_data("expr"))
     result["expr"] = _get_subtree_str(definition, expr)
 
-    for ref in tree.find_data("table"):
-        result["table"] = ref.children[0]
     for ref in tree.find_data("type"):
         result["type"] = ref.children[0]
-    id_ = next(tree.find_data("id")).children[0]
-    result["name"] = id_.replace("_", " ").title()
+
+    for ref in tree.find_data("table"):
+        result["table"] = ref.children[0]
+
+    for ref in tree.find_data("filter"):
+        result["filter"] = _get_subtree_str(definition, ref)
 
     for ref in tree.find_data("alias"):
         result["name"] = ref.children[0]
 
+    for ref in tree.find_data("properties"):
+        result.update(ref.children[0])
+
     return id_, result
-
-
-def _update_nested(d: dict, u: dict):
-    for k, v in u.items():
-        if isinstance(v, dict):
-            d[k] = _update_nested(d.get(k, {}), v)
-        else:
-            d[k] = v
-    return d
 
 
 class Project:
@@ -125,7 +125,7 @@ class Project:
         if isinstance(path, str):
             path = Path(path)
         if not path.exists():
-            raise FileNotFoundError(f"Path {path} does not exist")
+            raise MissingPathError(path)
 
         project_config = schema.Project.load(path)
 
@@ -134,6 +134,10 @@ class Project:
         model_data["description"] = project_config.description
         model_data["locale"] = project_config.locale
         model_data["currency"] = project_config.currency
+
+        tables_path = path / project_config.tables_path
+        if not tables_path.is_dir():
+            raise MissingPathError(path)
         model_data["tables"] = YAMLMappedDict.from_path(
             path / project_config.tables_path
         )
@@ -157,9 +161,9 @@ class Project:
 
     def query_graph(self, query: Query):
         computation = self.engine.get_computation(query)
-        return computation.graph()
+        return computation.graph(self.backend)
 
-    def ql(self, query: str):
+    def ql(self, query: str) -> analyses.QlQuery:
         return analyses.QlQuery(self, query)
 
     def select(self, *metrics: str) -> "analyses.Select":
@@ -205,7 +209,11 @@ class Project:
             method invocation.
         """
         example = importlib.import_module(f"dictum_core.examples.{name}.generate")
-        return example.generate()
+        result: Project = example.generate()
+        # prevent users from changing examples
+        result.project_config.root = None
+        result.model_data = YAMLMappedDict(result.model_data.dict())
+        return result
 
     def describe(self) -> pd.DataFrame:
         """Show project's metrics and dimensions and their compatibility. If a metric
@@ -236,6 +244,10 @@ class Project:
         ip = get_ipython()
         if ip is not None:
             ip.register_magics(ProjectMagics(project=self, shell=ip))
+            print(
+                r"Magics %ql, %table, %metric, %dimension are registered and bound "
+                f"to project {self.project_config.name}"
+            )
 
     def _repr_html_(self):
         template = environment.get_template("project.html.j2")
@@ -262,15 +274,13 @@ class Project:
         for item in items:
             if item.data == "related":
                 str_shorthand = _get_subtree_str(definition, item)
-                self.update_shorthand_related(f"{table} {str_shorthand}")
+                self.update_shorthand_related(f"{table}.{str_shorthand}")
             elif item.data == "dimension":
                 self.update_shorthand_dimension(
-                    _get_subtree_str(definition, item.children[0]), table
+                    _get_subtree_str(definition, item), table
                 )
             elif item.data == "metric":
-                self.update_shorthand_metric(
-                    _get_subtree_str(definition, item.children[0]), table
-                )
+                self.update_shorthand_metric(_get_subtree_str(definition, item), table)
             elif item.data == "table_format":
                 self.update_shorthand_format(
                     _get_subtree_str(definition, item.children[0])
@@ -278,8 +288,17 @@ class Project:
 
     def update_shorthand_related(self, definition: str):
         tree = parse_shorthand_related(definition)
-        target, parent = list(t.children[0] for t in tree.find_data("table"))
+        tables = tree.find_data("table")
+        parent = next(tables).children[0]
+        target = next(tables, None)
         alias = next(tree.find_data("alias")).children[0]
+        if target is None:
+            raise MissingShorthandTableError(
+                f"\nTable is required for standalone related shorthand: table.{alias}\n"
+                "                                                    ^^^^^"
+            )
+        target = target.children[0]
+        # parent, target = list(t.children[0] for t in tree.find_data("table"))
         columns = list(c.children[0] for c in tree.find_data("column"))
         foreign_key = columns[0]
         related_key = None
@@ -301,20 +320,22 @@ class Project:
         self.update_model(update)
 
     def update_shorthand_metric(self, definition: str, table: Optional[str] = None):
-        id_, calc = _get_calculation_kwargs(definition)
-        calc["table"] = calc.get("table", table)
-        update = {"metrics": {id_: calc}}
+        tree = parse_shorthand_metric(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        kwargs["table"] = kwargs.get("table", table)
+        update = {"metrics": {id_: kwargs}}
         self.update_model(update)
         self.latest_calc = self.model_data["metrics"][id_]
 
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
-        id_, calc = _get_calculation_kwargs(definition)
-        schema.Dimension.parse_obj(calc)  # validate before updating
+        tree = parse_shorthand_dimension(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        schema.Dimension.parse_obj(kwargs)  # validate before updating
         if table is None:
-            table = calc.pop("table", None)
+            table = kwargs.pop("table", None)
         if table is None:
             raise ValueError("Table is required, please specify with '@ table'")
-        update = {"tables": {table: {"dimensions": {id_: calc}}}}
+        update = {"tables": {table: {"dimensions": {id_: kwargs}}}}
         self.update_model(update)
 
         self.latest_calc = self.model_data["tables"][table]["dimensions"][id_]
@@ -330,9 +351,16 @@ class Project:
         self.update_model({})  # trigger model update
 
     def update_model(self, update: dict):
-        self.model_data.update_recursive(update)
-        model_config = schema.Model.parse_obj(self.model_data)
-        self.model = Model.from_config(model_config)
+        # avoid updating model_data until model is checked
+        new = self.model_data.copy()
+        new.update_recursive(update)
+
+        model_config = schema.Model.parse_obj(new)
+        self.model = Model.from_config(model_config)  # model checks happen here
+        # we're ok, can update model data
+        self.model_data = new
+
+        # do the rest of the stuff
         self.engine = Engine(self.model)
         self.metrics = ProjectMetrics(self)
         self.dimensions = ProjectDimensions(self)

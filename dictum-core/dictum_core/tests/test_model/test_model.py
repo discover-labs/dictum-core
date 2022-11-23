@@ -33,7 +33,7 @@ def test_dimension_same_table_as_measures(chinook: Model):
 
 
 def test_resolve_measures(chinook: Model):
-    assert chinook.measures["arppu"].expr == Tree(
+    assert chinook.measures["test_arppu"].expr == Tree(
         "expr",
         [
             Tree(
@@ -163,7 +163,7 @@ def test_get_lineage(chinook: Model):
 def test_replace_table():
     model = Model()
     test = model.add_table(id="test", source="test")
-    related = model.add_table(id="related", source="related")
+    model.add_table(id="related", source="related")
     test.add_related(
         str_table="related",
         related_key="x",

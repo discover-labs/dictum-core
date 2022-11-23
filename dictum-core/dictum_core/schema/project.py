@@ -7,6 +7,7 @@ import yaml
 from jinja2 import Template
 from pydantic import BaseModel
 
+from dictum_core.exceptions import MissingPathError
 from dictum_core.schema.id import ID
 
 
@@ -68,6 +69,9 @@ class Project(BaseModel):
         return cls.parse_obj(data)
 
     def get_profile(self, profile=None) -> dict:
+        profiles_path = self.root / self.profiles_path
+        if not profiles_path.exists():
+            raise MissingPathError(profiles_path)
         data = _load_yaml_template(self.root / self.profiles_path)
         profiles = Profiles.parse_obj(data)
         profile = profiles.default_profile if profile is None else profile

@@ -1,13 +1,16 @@
 from collections import UserDict
+from collections.abc import MutableMapping
 from itertools import chain
 from pathlib import Path
 
 import yaml
 
+from dictum_core.exceptions import DuplicateFileError, MissingPathError
+
 
 def _update_recursive(d, u):
     for k, v in u.items():
-        if isinstance(v, dict):
+        if isinstance(v, dict) and isinstance(d.get(k, {}), MutableMapping):
             d[k] = _update_recursive(d.get(k, {}), v)
         else:
             d[k] = v
@@ -32,6 +35,8 @@ class YAMLMappedDict(UserDict):
 
     @classmethod
     def from_path(cls, path: Path):
+        if not path.exists():
+            raise MissingPathError(path)
         if path.is_file() and path.suffix in cls.file_extensions:
             value = yaml.safe_load(path.read_text())
             result = cls(value)
@@ -39,16 +44,24 @@ class YAMLMappedDict(UserDict):
             return result
         if path.is_dir():
             items = {}
+            ids = set()
             for subpath in chain(
                 *(path.glob(f"**/*{ext}") for ext in cls.file_extensions)
             ):
                 key = subpath.stem
+                if key in ids:
+                    raise DuplicateFileError(
+                        f"Duplicate filenames at {path}: {subpath.name}"
+                    )
+                ids.add(key)
                 items[key] = cls.from_path(subpath)
             return cls(items)
 
     def flush(self):
         if self.path is not None:
-            self.path.write_text(yaml.safe_dump(self.dict(), sort_keys=False))
+            self.path.write_text(
+                yaml.safe_dump(self.dict(), sort_keys=False, allow_unicode=True)
+            )
         for v in self.data.values():
             if isinstance(v, YAMLMappedDict):
                 v.flush()
@@ -81,3 +94,6 @@ class YAMLMappedDict(UserDict):
                 self.path = base_path
         else:
             raise FileNotFoundError(f"{base_path} does not exist")
+
+    def copy(self) -> "YAMLMappedDict":
+        return YAMLMappedDict(self.dict())

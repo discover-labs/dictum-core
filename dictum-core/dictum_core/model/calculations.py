@@ -30,18 +30,21 @@ class Displayed:
 
 
 @dataclass
-class Calculation(Displayed):
-    """Parent class for measures and dimensions."""
-
+class Expression:
     str_expr: str
+
+    @property
+    def parsed_expr(self) -> Tree:
+        return parse_expr(self.str_expr)
 
     @property
     def expr(self) -> Tree:
         raise NotImplementedError
 
-    @property
-    def parsed_expr(self):
-        return parse_expr(self.str_expr)
+
+@dataclass
+class Calculation(Displayed, Expression):
+    """Parent class for measures and dimensions."""
 
     @property
     def expr_tree(self) -> str:
@@ -56,25 +59,25 @@ class Calculation(Displayed):
                 f"Error in {self} expression {self.str_expr}: {e}"
             ) from None
 
-    def check_references(self, path=tuple()):
-        if self.id in path:
-            raise RecursionError(f"Circular reference in {self}: {path}")
-        self.check_measure_references(path + (self.id,))
-        self.check_dimension_references(path + (self.id,))
+    # def check_references(self, path=tuple()):
+    #     if self.id in path:
+    #         raise RecursionError(f"Circular reference in {self}: {path}")
+    #     self.check_measure_references(path + (self.id,))
+    #     self.check_dimension_references(path + (self.id,))
 
-    def check_measure_references(self, path):
-        raise NotImplementedError
+    # def check_measure_references(self, path):
+    #     raise NotImplementedError
 
-    def check_dimension_references(self, path):
-        for ref in self.parsed_expr.find_data("dimension"):
-            dimension = self.table.allowed_dimensions.get(ref.children[0])
-            if dimension is None:
-                raise KeyError(
-                    f"{self} uses dimension {ref.children[0]}, but there's "
-                    f"no unambiguous join path between {self.table} "
-                    "and dimension's parent table"
-                )
-            dimension.check_references(path)
+    # def check_dimension_references(self, path):
+    #     for ref in self.parsed_expr.find_data("dimension"):
+    #         dimension = self.table.allowed_dimensions.get(ref.children[0])
+    #         if dimension is None:
+    #             raise KeyError(
+    #                 f"{self} uses dimension {ref.children[0]}, but there's "
+    #                 f"no unambiguous join path between {self.table} "
+    #                 "and dimension's parent table"
+    #             )
+    #         dimension.check_references(path)
 
     def prefixed_expr(self, prefix: List[str]) -> Tree:
         return utils.prefixed_expr(self.expr, prefix)
@@ -139,7 +142,7 @@ class Dimension(TableCalculation):
 
     @property
     def expr(self) -> Tree:
-        self.check_references()
+        # self.check_references()
         transformer = DimensionTransformer(
             self.table, self.table.measure_backlinks, self.table.allowed_dimensions
         )
@@ -160,13 +163,13 @@ class Dimension(TableCalculation):
             )
         return expr
 
-    def check_measure_references(self, path=tuple()):
-        for ref in self.parsed_expr.find_data("measure"):
-            measure_id = ref.children[0]
-            measure = self.table.measure_backlinks.get(measure_id).measures.get(
-                measure_id
-            )
-            measure.check_references(path)
+    # def check_measure_references(self, path=tuple()):
+    #     for ref in self.parsed_expr.find_data("measure"):
+    #         measure_id = ref.children[0]
+    #         measure = self.table.measure_backlinks.get(measure_id).measures.get(
+    #             measure_id
+    #         )
+    #         measure.check_references(path)
 
     @property
     def transforms(self) -> Dict[str, ScalarTransformMeta]:
@@ -174,9 +177,8 @@ class Dimension(TableCalculation):
 
 
 @dataclass
-class TableFilter:
+class TableFilter(Expression):
     table: "dictum_core.model.Table"
-    str_expr: str
 
     @property
     def expr(self) -> Tree:
@@ -187,6 +189,12 @@ class TableFilter:
             dimensions=self.table.allowed_dimensions,
         )
         return transformer.transform(expr)
+
+    def __str__(self) -> str:
+        return f"TableFilter({self.str_expr}) on {self.table}"
+
+    def __hash__(self):
+        return hash(id(self))
 
 
 @dataclass
@@ -225,35 +233,49 @@ class MeasureTransformer(Transformer):
         return self._dimensions[dimension_id].prefixed_expr(path).children[0]
 
 
+@dataclass
+class MeasureFilter(Expression):
+    measure: "Measure"
+
+    @property
+    def expr(self) -> Tree:
+        table = self.measure.table
+        transformer = DimensionTransformer(
+            table, table.measure_backlinks, table.allowed_dimensions
+        )
+        return transformer.transform(self.parsed_expr)
+
+    def __str__(self) -> str:
+        return f"Filter({self.str_expr} on {self.measure})"
+
+
 @dataclass(repr=False)
 class Measure(TableCalculation):
     model: "dictum_core.model.Model"
     str_filter: Optional[str] = None
     str_time: Optional[str] = None
 
-    def __post_init__(self):
-        if self.kind != "aggregate":
-            raise ValueError(
-                f"Measures must be aggregate, {self} expression is not: {self.str_expr}"
-            )
+    # def __post_init__(self):
+    #     if self.kind != "aggregate":
+    #         raise ValueError(
+    #             f"Measures must be aggregate, {self} expression is not:
+    # {self.str_expr}"
+    #         )
 
     @property
     def expr(self) -> Tree:
-        self.check_references()
+        # self.check_references()
         transformer = MeasureTransformer(
             self.table, self.table.measures, self.table.allowed_dimensions
         )
         return transformer.transform(self.parsed_expr)
 
     @property
-    def filter(self) -> Tree:
+    def filter(self) -> TableFilter:
         if self.str_filter is None:
             return None
-        self.check_references()
-        transformer = DimensionTransformer(
-            self.table, self.table.measure_backlinks, self.table.allowed_dimensions
-        )
-        return transformer.transform(parse_expr(self.str_filter))
+        return MeasureFilter(measure=self, str_expr=self.str_filter)
+        # self.check_references()
 
     @property
     def time(self) -> Dimension:
@@ -271,10 +293,10 @@ class Measure(TableCalculation):
                     result[dimension.id] = dimension
         return result
 
-    def check_measure_references(self, path=tuple()):
-        for ref in self.parsed_expr.find_data("measure"):
-            measure = self.table.measures.get(ref.children[0])
-            measure.check_references(path)
+    # def check_measure_references(self, path=tuple()):
+    #     for ref in self.parsed_expr.find_data("measure"):
+    #         measure = self.table.measures.get(ref.children[0])
+    #         measure.check_references(path)
 
     def __eq__(self, other: "Metric"):
         return self.id == other.id

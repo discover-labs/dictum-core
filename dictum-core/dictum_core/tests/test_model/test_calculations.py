@@ -9,7 +9,7 @@ def test_measure_dimensions_union(chinook: Model):
 def test_metric_dimensions(chinook: Model):
     dimensions = chinook.metrics["revenue_per_track"].dimensions
     assert isinstance(dimensions, list)
-    assert len(dimensions) == 6
+    assert len(dimensions) == 7
 
 
 def test_metric_generic_time_dimensions(chinook: Model):

@@ -27,3 +27,8 @@ dimensions:
         'Purchased AAC audio file'
       )
     type: bool
+  track_revenue:
+    name: Track Revenue
+    expr: $revenue
+    type: float
+    format: currency

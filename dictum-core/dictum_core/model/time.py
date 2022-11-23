@@ -1,5 +1,8 @@
 from dictum_core.format import Format
+from dictum_core.model.scalar import transforms_by_input_type
 from dictum_core.model.types import Type
+
+datetime_transforms = transforms_by_input_type["datetime"]
 
 
 class GenericTimeDimension:
@@ -39,6 +42,10 @@ class GenericTimeDimension:
 
     def __hash__(self):
         return hash(self.id)
+
+    @property
+    def transforms(self) -> dict:
+        return datetime_transforms
 
 
 class Time(GenericTimeDimension):

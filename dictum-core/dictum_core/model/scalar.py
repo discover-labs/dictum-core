@@ -197,7 +197,7 @@ class IsInTransform(ScalarTransform):
     id = "isin"
     name = "IN"
 
-    input_types: List[str] = ["string", "int"]
+    input_types: List[str] = ["string", "int", "float", "datetime"]
     return_type = Type(name="bool")
 
     def transform_expr(self, expr: Tree) -> Tree:

@@ -126,7 +126,7 @@ class Relation:
         for join in self.join_tree:
             prefix = (*path, join.alias)
             yield UnnestedJoin(
-                expr=utils.prepare_expr(join.expr, path),
+                expr=utils.prefixed_expr(join.expr, path),
                 right_identity=".".join(prefix),
                 right=join.source,
                 inner=join.inner,
@@ -140,12 +140,6 @@ class Join(Relation):
     alias: str
     expr: Tree
     inner: bool = False
-
-    def prepare(self):
-        if isinstance(self.source, RelationalQuery):
-            self.source.prepare()
-        for join in self.join_tree:
-            join.prepare()
 
     def __eq__(self, other: "Join"):
         return (
@@ -222,20 +216,3 @@ class RelationalQuery(Relation):
     @property
     def columns(self) -> List[Column]:
         return [*self._groupby, *self._aggregate]
-
-    @staticmethod
-    def prepare_expr(expr: Tree) -> Tree:
-        expr = deepcopy(expr)
-        for ref in expr.find_data("column"):
-            *path, id_ = ref.children
-            ref.children = [".".join(path), id_]
-        return expr
-
-    def prepare(self):
-        for column in self._aggregate + self._groupby:
-            column.expr = self.prepare_expr(column.expr)
-        self.filters = list(map(self.prepare_expr, self.filters))
-        for item in self.order:
-            item.expr = self.prepare_expr(item.expr)
-        for join in self.join_tree:
-            join.prepare()

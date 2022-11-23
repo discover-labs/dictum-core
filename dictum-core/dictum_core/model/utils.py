@@ -16,12 +16,3 @@ def prefixed_expr(expr: Tree, prefix: List[str]) -> Tree:
         _, *path, field = ref.children
         ref.children = [*prefix, *path, field]
     return result
-
-
-def prepare_expr(expr: Tree, prefix: List[str]) -> Tree:
-    """Prepare the expression for query: turn prefixed path into .-delimited string"""
-    expr = prefixed_expr(expr, prefix)
-    for ref in expr.find_data("column"):
-        *path, field = ref.children
-        ref.children = [".".join(path), field]
-    return expr
