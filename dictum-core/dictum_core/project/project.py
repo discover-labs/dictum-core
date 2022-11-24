@@ -192,13 +192,17 @@ class Project:
         return ProjectChart(self)
 
     @classmethod
-    def example(cls, name: str) -> "Project":
+    def example(cls, name: str, empty: bool = False) -> "Project":
         """Load an example project.
 
         Arguments:
             name (str):
                 Name of the example project. Valid values: ``chinook``,
                 ``empty``.
+            empty (bool):
+                If True, the model will be empty.
+                Defaults to False.
+
 
         Returns:
             CachedProject: same as ``Project``, but won't read the model config at each
@@ -210,7 +214,15 @@ class Project:
         result = Project.from_path(path)
         # prevent users from changing examples
         result.project_config.root = None
-        result.model_data = YAMLMappedDict(result.model_data.dict())
+        if empty:  # initialize an empty model
+            model_data = schema.Model(
+                name=result.project_config.name,
+                locale=result.project_config.locale,
+                currency=result.project_config.currency,
+            ).dict()
+            result.model_data = YAMLMappedDict(model_data)
+        else:  # remove all paths to avoid overwriting by user
+            result.model_data = YAMLMappedDict(result.model_data.dict())
         return result
 
     def describe(self) -> pd.DataFrame:

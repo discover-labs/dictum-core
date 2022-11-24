@@ -411,7 +411,7 @@ class BackendRegistry(UserDict):
     def __getitem__(self, key: str) -> "Backend":
         if key not in self.registry:
             raise ImportError(
-                f"Backend {type} was not found. Try installing dictum[{type}] "
+                f"Backend {key} was not found. Try installing dictum[{type}] "
                 "package."
             )
         return self.data[key]

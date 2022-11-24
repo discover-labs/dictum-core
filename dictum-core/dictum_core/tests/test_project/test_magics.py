@@ -116,7 +116,7 @@ def test_standalone_table(tmp_path: Path, project):
 
 @pytest.fixture(scope="function")
 def empty():
-    return Project.example("empty")
+    return Project.example("chinook", empty=True)
 
 
 def test_project_create_table(empty: Project):

@@ -1,4 +1,4 @@
-from dictum_core.backends.chinook import ChinookBackend
+from dictum_core.backends.sample import SampleBackend
 from dictum_core.backends.sqlite import SQLiteBackend
 
-__all__ = ["ChinookBackend", "SQLiteBackend"]
+__all__ = ["SampleBackend", "SQLiteBackend"]
