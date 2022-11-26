@@ -1,0 +1,4 @@
+name: Finished Questions Pct
+expr: $finished_questions / $questions
+format: percent
+table: null

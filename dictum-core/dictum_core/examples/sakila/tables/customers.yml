@@ -1,0 +1,6 @@
+source: customer
+dimensions:
+  customer_registration_date:
+    name: Customer Registration Date
+    expr: create_date
+    type: date

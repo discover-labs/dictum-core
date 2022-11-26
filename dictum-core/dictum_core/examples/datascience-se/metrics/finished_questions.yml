@@ -1,0 +1,5 @@
+name: Finished Questions
+expr: count()
+filter: :question_is_finished
+time: post_date
+table: posts

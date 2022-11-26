@@ -1,0 +1,5 @@
+name: Answers
+expr: count()
+filter: not :post_is_question
+time: post_date
+table: posts

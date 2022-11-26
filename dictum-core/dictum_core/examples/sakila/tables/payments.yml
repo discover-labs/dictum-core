@@ -1,0 +1,11 @@
+source: payment
+dimensions:
+  payment_date:
+    name: Payment Date
+    expr: payment_date
+    type: date
+related:
+  rental:
+    table: rentals
+    related_key: null
+    foreign_key: rental_id

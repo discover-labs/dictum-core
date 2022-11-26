@@ -1,0 +1,4 @@
+name: New Rentals
+expr: count()
+table: rentals
+time: rental_date

@@ -8,7 +8,6 @@ from dictum_core.exceptions import ShorthandSyntaxError
 from dictum_core.project.magics.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
     parse_shorthand_dimension,
-    parse_shorthand_format,
     parse_shorthand_metric,
     parse_shorthand_table,
 )
@@ -96,16 +95,6 @@ def test_parse_table_with_related():
     result = parse_shorthand_table("table related alias = column -> other.column")
     _, related = result.children
     assert related.data == "related"
-
-
-def test_parse_format_str():
-    result = parse_shorthand_format("currency")
-    assert result == Tree("format", ["currency"])
-
-
-def test_parse_format_kv():
-    result = parse_shorthand_format("kind=currency currency=USD")
-    assert result == Tree("format", [("kind", "currency"), ("currency", "USD")])
 
 
 def test_standalone_table(tmp_path: Path, project):

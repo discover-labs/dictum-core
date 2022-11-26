@@ -80,7 +80,3 @@ class ProjectMagics(Magics):
         if cell is None:
             cell = ""
         self.project.update_shorthand_metric(f"{line} {cell}")
-
-    @line_magic
-    def format(self, line: str):
-        self.project.update_shorthand_format(line)

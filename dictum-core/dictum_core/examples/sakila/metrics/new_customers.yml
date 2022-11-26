@@ -1,0 +1,5 @@
+name: Number of New Customers
+expr: count()
+time: customer_registration_date
+missing: '0'
+table: customers

@@ -1,0 +1,4 @@
+name: Posts
+expr: count()
+time: post_date
+table: posts

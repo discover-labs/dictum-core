@@ -1,0 +1,5 @@
+name: Revenue
+expr: sum(amount)
+format: currency
+time: payment_date
+table: payments

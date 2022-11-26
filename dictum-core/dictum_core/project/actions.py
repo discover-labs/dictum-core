@@ -40,7 +40,11 @@ def copy_project_template(target_path: Path, template_vars: dict):
             rendered = template.render(**template_vars)
             new_path.write_text(rendered)
         elif path.is_dir():
-            shutil.copytree(str(path), str(new_path))
+            shutil.copytree(
+                str(path),
+                str(new_path),
+                ignore=lambda _, fs: filter(lambda x: x == ".gitkeep", fs),
+            )
 
 
 def create_new_project(

@@ -1,0 +1,7 @@
+source: inventory
+primary_key: inventory_id
+related:
+  film:
+    table: films
+    related_key: null
+    foreign_key: film_id

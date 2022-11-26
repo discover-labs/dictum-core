@@ -1,0 +1,5 @@
+name: Answered Questions
+expr: count()
+filter: :question_is_answered
+time: post_date
+table: posts

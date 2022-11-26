@@ -48,7 +48,7 @@ class AddMetric:
 
     @property
     def metric(self) -> Metric:
-        return self.model.metrics.get(self.request.metric.id)
+        return self.model.metrics[self.request.metric.id]
 
     def add_measures(self, merge: MergeOperator) -> MergeOperator:
         existing_measures = {

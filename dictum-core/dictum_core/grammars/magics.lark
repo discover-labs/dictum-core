@@ -17,11 +17,8 @@ filter: "where" expr
 
 related: [ table "." ] alias "=" column "->" table [ "." column ]
 
-format: IDENTIFIER | key_value+
-
 table_metric: "metric"i metric
 table_dimension: "dimension"i dimension
-table_format: "format"i format
 table_related: "related"i related
 
 key_value: IDENTIFIER "=" ( identifier | key_values )  // value can be quoted or nested
@@ -31,6 +28,6 @@ pk: "[" IDENTIFIER "]"
 source: IDENTIFIER | key_values
 table_def: table pk? source?
 
-table_full: table_def ( table_related | table_metric | table_dimension | table_format )*
+table_full: table_def ( table_related | table_metric | table_dimension )*
 
 %ignore /\s/

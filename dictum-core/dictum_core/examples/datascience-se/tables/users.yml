@@ -1,0 +1,7 @@
+source: users
+primary_key: id
+dimensions:
+  user_creation_date:
+    name: User Creation Date
+    expr: creationdate
+    type: datetime

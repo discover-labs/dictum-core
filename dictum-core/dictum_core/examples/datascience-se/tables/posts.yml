@@ -1,0 +1,40 @@
+source: posts
+primary_key: id
+related:
+  author:
+    table: users
+    related_key: null
+    foreign_key: owneruserid
+  parent:
+    table: posts
+    related_key: null
+    foreign_key: parentid
+dimensions:
+  post_date:
+    name: Post Date
+    expr: creationdate
+    type: datetime
+  answer_delay:
+    name: Answer Delay
+    expr: datediff('day', parent.creationdate, creationdate)
+    type: int
+  post_is_question:
+    name: Post Is Question
+    expr: parentid is null
+    type: bool
+  post_is_answer:
+    name: Post Is Answer
+    expr: parentid is not null
+    type: bool
+  question_is_answered:
+    name: Question Is Answered
+    expr: answercount > 0
+    type: bool
+  question_is_finished:
+    name: Question Is Finished
+    expr: :post_is_question and acceptedanswerid is null
+    type: bool
+  post_months_after_user_creation:
+    name: Post Months After User Creation
+    expr: datediff('day', :user_creation_date, :post_date) // 30
+    type: int

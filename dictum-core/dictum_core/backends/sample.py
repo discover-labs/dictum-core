@@ -11,8 +11,8 @@ cache_path = Path(__file__).parent / "sample_cache"
 cache_path.mkdir(exist_ok=True)
 
 download_url = (
-    "https://github.com/discover-labs/dictum-sample-databases/raw/master"
-    "/{name}.sqlite.sql"
+    "https://github.com/discover-labs/dictum-sample-databases/blob/master/"
+    "{name}.sqlite.sql?raw=true"
 )
 
 

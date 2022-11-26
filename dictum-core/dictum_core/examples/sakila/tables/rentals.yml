@@ -1,0 +1,20 @@
+source: rental
+primary_key: rental_id
+related:
+  inventory:
+    table: inventory
+    related_key: null
+    foreign_key: inventory_id
+dimensions:
+  rental_date:
+    name: Rental Date
+    expr: rental_date
+    type: date
+  rental_return_date:
+    name: Rental Return Date
+    expr: rental_return_date
+    type: date
+  rental_duration:
+    name: Rental Duration (days)
+    expr: datediff('day', rental_date, rental_return_date)
+    type: int
