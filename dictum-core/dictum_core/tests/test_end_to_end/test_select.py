@@ -603,3 +603,28 @@ def test_total_of_within_keyerror(project: Project):
             "revenue.total of (Year)",
         ).by("Year", "Quarter")
     ).df()
+
+
+def test_total_with_sum(project: Project):
+    """Bug: When two metrics are requested, on SQLite PandasCompiler is used
+    to calculate the window, and it was implemented incorrectly, resulting in an error.
+    """
+    project.select("revenue.total", "revenue.sum").by("genre").df()
+
+
+def test_running_sum_single(project: Project):
+    df = project.select("revenue.running_sum within (Year)").by("Year", "Month").df()
+    assert df["revenue__running_sum_within_Year"].max() == 481.45
+
+
+def test_running_sum_multiple(project: Project):
+    df = (
+        project.select(
+            "items_sold",  # select multiple measures
+            "revenue.sum within (Year)",
+            "revenue.running_sum within (Year)",
+        )
+        .by("Year", "Month")
+        .df()
+    )
+    assert df["revenue__running_sum_within_Year"].max() == 481.45

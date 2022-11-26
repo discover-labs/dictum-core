@@ -477,3 +477,51 @@ class AddSumMetric(AddAdditivelyTransformedMetric):
                 kind="metric",
             ),
         )
+
+
+class AddRunningSumMetric(AddAdditivelyTransformedMetric):
+    id = "running_sum"
+    name = "Running Sum"
+
+    def get_column(self) -> Column:
+        expr = self.metric.merged_expr.children[0]
+        dimensions = self.transform.of + self.transform.within
+
+        # "along" is implicit: everything that's not in the partition clause =
+        # goes into order by
+        along = self.get_unlisted_query_dimensions()
+        partition_by = Tree(
+            "partition_by", [Tree("column", [None, d.digest]) for d in dimensions]
+        )
+        order_by = Tree(
+            "order_by",
+            [
+                Tree(
+                    "order_by_item",
+                    [
+                        Tree("column", [None, d.digest]),
+                        True,  # always ascending
+                    ],
+                )
+                for d in along
+            ],
+        )
+        return Column(
+            name=self.request.name,
+            expr=Tree(
+                "expr",
+                [Tree("call_window", ["sum", expr, partition_by, order_by, None])],
+            ),
+            type=self.metric.type,
+            display_info=DisplayInfo(
+                display_name=(
+                    self.metric.name
+                    if self.request.alias is None
+                    else self.request.alias
+                ),
+                column_name=self.request.name,
+                format=self.metric.format,
+                type=self.metric.type,
+                kind="metric",
+            ),
+        )

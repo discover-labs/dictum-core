@@ -3,7 +3,7 @@ from typing import Any, Dict, List
 
 import numpy as np
 import pandas as pd
-from lark import Transformer
+from lark import Transformer, Tree
 
 from dictum_core.backends.base import Compiler
 from dictum_core.backends.mixins.arithmetic import ArithmeticCompilerMixin
@@ -81,9 +81,26 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
 
     # window functions
 
-    def window_sum(self, arg, partition, order, rows):
+    def window_sum(
+        self, args: List[pd.Series], partition: List[pd.Series], order: List[Tree], rows
+    ):
+        arg = args[0]  # there's only one arg
+
+        # running sum
+        if order:
+            by, ascending = zip(*(i.children for i in order))
+            sort_df = pd.DataFrame(by).T
+            sort_cols = sort_df.columns.to_list()
+            ix_order = sort_df.sort_values(
+                sort_cols, ascending=ascending
+            ).index.tolist()
+            return arg.loc[ix_order].groupby(partition).cumsum()
+
+        # unordered partitioned sum
         if partition:
             return arg.groupby(partition).transform(sum)
+
+        # just a sum
         return arg.groupby(pd.Series(0, index=arg.index)).transform(sum)
 
     def window_row_number(self, args, partition, order, rows):
