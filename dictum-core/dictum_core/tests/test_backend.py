@@ -249,7 +249,7 @@ def test_dateadd(compute):
     dt = "2022-02-27 11:22:33"
 
     def dateadd(part: str, interval: int):
-        return compute(f"dateadd('{part}', {interval}, '{dt}')")
+        return compute(f"dateadd('{part}', {interval}, toDatetime('{dt}'))")
 
     assert dateadd("year", 42) == "2064-02-27 11:22:33"
     assert dateadd("quarter", 42) == "2032-08-27 11:22:33"
