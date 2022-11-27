@@ -30,4 +30,7 @@ table_def: table pk? source?
 
 table_full: table_def ( table_related | table_metric | table_dimension )*
 
+COMMENT: "#" /.*/
+
 %ignore /\s/
+%ignore COMMENT

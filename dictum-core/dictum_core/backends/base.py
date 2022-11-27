@@ -351,6 +351,10 @@ class Compiler(ABC):
         """
 
     @abstractmethod
+    def dateadd(self, part, interval, value):
+        """Add a number of periods to the date/datetime"""
+
+    @abstractmethod
     def now(self):
         """Current timestamp"""
 

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Union
 
@@ -68,7 +69,7 @@ class Project:
         self.backend = backend
 
         self.model_data = model_data
-        self.staged_model_data = model_data
+        self.staged_model_data = deepcopy(model_data)
         model_config = schema.Model.parse_obj(model_data)
 
         self.model = Model.from_config(model_config)
@@ -218,9 +219,10 @@ class Project:
                 locale=result.project_config.locale,
                 currency=result.project_config.currency,
             ).dict()
-            result.model_data = YAMLMappedDict(model_data)
+            result.staged_model_data = YAMLMappedDict(model_data)
         else:  # remove all paths to avoid overwriting by user
-            result.model_data = YAMLMappedDict(result.model_data.dict())
+            result.staged_model_data = YAMLMappedDict(result.model_data.dict())
+        result.commit_model_data()
         return result
 
     def describe(self) -> alt.Chart:
@@ -396,16 +398,16 @@ class Project:
         self.staged_model_data.update_recursive(update)
 
     def commit_model_data(self):
-        model_config = schema.Model.parse_obj(self.staged_model_data)
         try:
+            model_config = schema.Model.parse_obj(self.staged_model_data)
             self.model = Model.from_config(model_config)  # model checks happen here
         except Exception:
             # staged model data is invalid, rollback an re-raise
-            self.staged_model_data = self.model_data
+            self.staged_model_data = deepcopy(self.model_data)
             raise
 
         # we're ok, can update model data
-        self.model_data = self.staged_model_data
+        self.model_data = deepcopy(self.staged_model_data)
 
         # do the rest of the stuff
         self.engine = Engine(self.model)

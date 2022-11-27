@@ -164,6 +164,9 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
         }
         return arg.dt.round(mapping[part])
 
+    def dateadd(self, part, interval, value):
+        raise NotImplementedError
+
     # for DatediffCompilerMixin
     def datediff_day(self, start, end):
         return (end - start).days

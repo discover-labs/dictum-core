@@ -106,6 +106,23 @@ class SQLiteFunctionsMixin:
         end_day = func.julianday(self.datetrunc("day", end))
         return cast(end_day - start_day, Integer)
 
+    def dateadd(self, part, interval, value):
+        """In sqlite adding dates/datetimes is done this way:
+        DATETIME(value, '+7 day')
+
+        The only parts that don't work as-is are quarter and week. We have to replace
+        them with 7 days and 3 months.
+        """
+        if part == "week":
+            part = "day"
+            interval = interval * 7
+
+        if part == "quarter":
+            part = "month"
+            interval = interval * 3
+
+        return func.datetime(value, f"{interval} {part}")
+
     def now(self):
         return func.datetime()
 

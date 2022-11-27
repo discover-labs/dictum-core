@@ -150,6 +150,9 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
     def datediff(self, part, start, end):
         return func.datediff(part, start, end)
 
+    def dateadd(self, part, interval, value):
+        return func.dateadd(part, interval, value)
+
     def now(self):
         return func.now()
 

@@ -245,6 +245,22 @@ def test_datediff(compute):
     assert datediff("second", "2021-12-31 04:59:59", "2021-12-31 04:59:59") == 0
 
 
+def test_dateadd(compute):
+    dt = "2022-02-27 11:22:33"
+
+    def dateadd(part: str, interval: int):
+        return compute(f"dateadd('{part}', {interval}, '{dt}')")
+
+    assert dateadd("year", 42) == "2064-02-27 11:22:33"
+    assert dateadd("quarter", 42) == "2032-08-27 11:22:33"
+    assert dateadd("month", 42) == "2025-08-27 11:22:33"
+    assert dateadd("week", 42) == "2022-12-18 11:22:33"
+    assert dateadd("day", 42) == "2022-04-10 11:22:33"
+    assert dateadd("hour", 42) == "2022-03-01 05:22:33"
+    assert dateadd("minute", 42) == "2022-02-27 12:04:33"
+    assert dateadd("second", 42) == "2022-02-27 11:23:15"
+
+
 def test_date(compute_results: callable):
     query = Query.parse_obj(
         {
