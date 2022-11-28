@@ -2,6 +2,7 @@
 
 %import common.SIGNED_FLOAT  -> FLOAT
 %import common.SIGNED_INT    -> INTEGER
+%import common.INT           -> UINTEGER
 %import common._STRING_ESC_INNER
 STRING: "'" _STRING_ESC_INNER "'"
 TRUE: "TRUE"i
@@ -53,7 +54,7 @@ _tuple: "(" literal ("," literal)* ")"
 select: _SELECT metric_request ( "," metric_request )*
 where: _WHERE dimension ( "," dimension )*
 groupby: _GROUPBY dimension_request ( "," dimension_request )*
-limit: _LIMIT metric ( "," metric )*
+limit: _LIMIT UINTEGER | _LIMIT metric ( "," metric )*
 
 query: select [ where ] [ groupby [ limit ] ]
 

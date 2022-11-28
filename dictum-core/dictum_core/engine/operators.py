@@ -203,8 +203,8 @@ class MergeOperator(Operator, MaterializeMixin):
         self.inputs = inputs if inputs is not None else []
         self.dimensions: List[Column] = []
         self.metrics: List[Column] = []
-        self.limit: Optional[int] = []
-        self.order: Optional[List[engine.LiteralOrderItem]] = []
+        self.limit: Optional[int] = None
+        self.order: Optional[List[engine.OrderItem]] = []
 
     @property
     def digest(self) -> str:
@@ -270,11 +270,21 @@ class MergeOperator(Operator, MaterializeMixin):
         result = concat(columns, axis=1)
 
         if self.order:
-            result = result.sort_values(
-                by=[i.name for i in self.order],
-                ascending=[i.ascending for i in self.order],
-            )
-        if self.limit:
+            order_series = []
+            order_ascending = []
+            for item in self.order:
+                s = compiler.transformer.transform(
+                    column_transformer.transform(item.expr)
+                )
+                order_series.append(s)
+                order_ascending.append(item.ascending)
+            order_df = concat(order_series, axis=1)
+            sort_index = order_df.sort_values(
+                by=order_df.columns.to_list(), ascending=order_ascending
+            ).index.to_list()
+            result = result.loc[sort_index]
+
+        if self.limit is not None:
             result = result.head(self.limit)
 
         return result
@@ -338,12 +348,13 @@ class MergeOperator(Operator, MaterializeMixin):
             return self.calculate_pandas(result)
 
         result = backend.calculate(result, self.columns)
-        if self.limit:
-            result = backend.limit(result, self.limit)
 
         # TODO: support order in the query
         if self.order:
             result = backend.order(result, self.order)
+
+        if self.limit is not None:
+            result = backend.limit(result, self.limit)
 
         return result
 
@@ -403,6 +414,17 @@ class FilterOperator(Operator):
 
 
 class RecordsFilterOperator(Operator):
+    """Filter a query with sets of literal records (dicts).
+
+    Filtering records are received from MaterializeOperator.
+
+    Parameters:
+        query: Query to filter
+        materialized: MaterializeOperator that provides the filtering tuples
+        drop_last_column: if True, last column from MaterializeOperator's result sets
+            will be dropped
+    """
+
     def __init__(
         self,
         query: Operator,

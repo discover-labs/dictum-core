@@ -84,6 +84,7 @@ known_functions = {
     "datediff",
     "datepart",
     "datetrunc",
+    "dateadd",
     "IF",
 }
 

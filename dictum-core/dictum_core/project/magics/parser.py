@@ -18,6 +18,7 @@ dimension_parser = Lark.open(
 table_parser = Lark.open(
     "magics.lark", rel_to=grammars, start="table_full", propagate_positions=True
 )
+union_parser = Lark.open("magics.lark", rel_to=grammars, start="union")
 
 
 class Preprocessor(Transformer):
@@ -85,3 +86,8 @@ def parse_shorthand_dimension(definition: str) -> Tree:
 @catch_syntax_errors
 def parse_shorthand_related(definition: str) -> Tree:
     return preprocessor.transform(related_parser.parse(definition))
+
+
+@catch_syntax_errors
+def parse_shorthand_union(definition: str) -> Tree:
+    return preprocessor.transform(union_parser.parse(definition))

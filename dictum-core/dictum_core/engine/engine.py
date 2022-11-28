@@ -6,7 +6,7 @@ from toolz import compose_left
 from dictum_core import model, schema
 from dictum_core.engine.aggregate_query_builder import AggregateQueryBuilder
 from dictum_core.engine.checks import check_query
-from dictum_core.engine.computation import LiteralOrderItem, RelationalQuery
+from dictum_core.engine.computation import RelationalQuery
 from dictum_core.engine.metrics import AddMetric, limit_transforms, transforms
 from dictum_core.engine.operators import (
     FinalizeOperator,
@@ -58,19 +58,21 @@ class Engine:
                     raise KeyError(f"Transform {transform_id} does not exist")
                 adders.append(adder(request=request, builder=builder))
 
-        for metric in query.limit:
-            transform_id = metric.transforms[0].id
-            adder = limit_transforms.get(transform_id)
-            if adder is None:
-                raise KeyError(f"Transform {transform_id} does not exist")
-            adders.append(adder(metric=metric, builder=builder))
+        if isinstance(query.limit, list):
+            for metric in query.limit:
+                transform_id = metric.transforms[0].id
+                adder = limit_transforms.get(transform_id)
+                if adder is None:
+                    raise KeyError(f"Transform {transform_id} does not exist")
+                adders.append(adder(metric=metric, builder=builder))
+        elif isinstance(query.limit, int):
+            merge.limit = query.limit
 
         return compose_left(*adders)(merge)
 
     def get_computation(self, query: schema.Query) -> MergeOperator:
         check_query(self.model, query)
         terminal = self.get_terminal(query)
-        terminal.order = [LiteralOrderItem(r.digest, True) for r in query.dimensions]
         return FinalizeOperator(
             input=MaterializeOperator([terminal]),
             aliases={r.digest: r.name for r in query.metrics + query.dimensions},

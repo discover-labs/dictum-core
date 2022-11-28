@@ -177,3 +177,16 @@ def test_project_create_from_scratch_write(tmp_path: Path, project: Project):
     project.write()
     arppu = yaml.safe_load((tmp_path / "metrics" / "arppu.yml").read_text())
     assert arppu["name"] == "Average Revenue per Paying User"
+
+
+def test_update_shorthand_union(empty: Project):
+    empty.update_shorthand_union("country ::str")
+
+    assert "country" in empty.model.dimensions
+
+
+def test_update_shorthand_union_named(empty: Project):
+    empty.update_shorthand_union('country ::str as "Ctry"')
+
+    assert "country" in empty.model.dimensions
+    assert empty.model.dimensions["country"].name == "Ctry"

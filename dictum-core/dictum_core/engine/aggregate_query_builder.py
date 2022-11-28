@@ -5,7 +5,7 @@ from toolz import compose_left
 
 from dictum_core.engine.computation import Column, RelationalQuery
 from dictum_core.engine.result import DisplayInfo
-from dictum_core.model import DimensionsUnion, Measure, Model
+from dictum_core.model import Measure, Model
 from dictum_core.model.scalar import DatetruncTransform
 from dictum_core.model.time import GenericTimeDimension
 from dictum_core.schema import QueryDimension, QueryDimensionRequest
@@ -31,14 +31,7 @@ class AggregateQueryBuilder:
         a given measure's anchor table.
         """
         anchor = measure.table
-        dimension = measure.dimensions.get(request.dimension.id)
-
-        # if union, replace dimension with it
-        if isinstance(dimension, DimensionsUnion):
-            union = dimension
-            dimension = anchor.allowed_dimensions.get(union.id)
-            if dimension is None:
-                raise ValueError(f"Can't use {union} with {measure}")
+        dimension = measure.dimensions[request.dimension.id]
 
         transforms = [
             self.model.scalar_transforms[t.id](*t.args)

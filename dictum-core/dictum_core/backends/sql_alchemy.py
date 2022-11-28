@@ -30,7 +30,7 @@ from sqlalchemy.sql.functions import coalesce
 import dictum_core.model
 from dictum_core.backends.base import Backend, Compiler
 from dictum_core.backends.mixins.arithmetic import ArithmeticCompilerMixin
-from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
+from dictum_core.engine import Column, OrderItem, RelationalQuery
 
 logger = logging.getLogger(__name__)
 
@@ -330,10 +330,11 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
     def limit(self, query: Select, limit: int):
         return query.limit(limit)
 
-    def order(self, query: Select, items: List[LiteralOrderItem]) -> Select:
+    def order(self, query: Select, items: List[OrderItem]) -> Select:
         clauses = []
+        column_transformer = ColumnTransformer({None: query})
         for item in items:
-            clause = query.selected_columns[item.name]
+            clause = self.transformer.transform(column_transformer.transform(item.expr))
             clause = clause.asc() if item.ascending else clause.desc()
             clauses.append(clause)
         return query.order_by(*clauses)

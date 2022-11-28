@@ -491,3 +491,13 @@ def test_parse_unary_not():
             Tree("scalar_transform", ["invert"]),
         ],
     )
+
+
+def test_parse_literal_limit():
+    assert compile_query("select a by b limit 5") == Query.parse_obj(
+        {
+            "metrics": [{"metric": {"id": "a"}}],
+            "dimensions": [{"dimension": {"id": "b"}}],
+            "limit": 5,
+        }
+    )

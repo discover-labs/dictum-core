@@ -66,9 +66,8 @@ class AddMetric:
         engine = dictum_core.engine.engine.Engine(self.model)
         return engine.get_terminal(query=query)
 
-    def __call__(self, merge: MergeOperator):
-        merge = self.add_measures(merge)
-        column = Column(
+    def get_metric_column(self) -> Column:
+        return Column(
             name=self.request.digest,
             expr=self.metric.merged_expr,
             type=self.metric.type,
@@ -82,6 +81,10 @@ class AddMetric:
                 kind="metric",
             ),
         )
+
+    def __call__(self, merge: MergeOperator):
+        merge = self.add_measures(merge)
+        column = self.get_metric_column()
         merge.metrics.append(column)
         return merge
 
@@ -232,30 +235,29 @@ class AddTopBottomLimit(AddLimit):
             ],
         )
 
-        # if the inputs to the merge are TuplesFilters, it means that
+        # if the inputs to the merge are RecordsFilters, it means that
         # this top isn't the first, so we just add the terminal to
         # materialize
         if all(isinstance(i, RecordsFilterOperator) for i in merge.inputs):
             materialized = merge.inputs[0].materialized
             materialized.inputs.append(terminal)
-            return merge
+        else:
+            # otherwize create MaterializeOperator and add a TuplesFilter
+            # before each query
 
-        # otherwize create MaterializeOperator and add a TuplesFilter
-        # before each query
+            # terminal Merge -> Materialize
+            materialized = MaterializeOperator([terminal])
 
-        # terminal Merge -> Materialize
-        materialized = MaterializeOperator([terminal])
-
-        # add TuplesFilter to each input of the original merge
-        # (excluding merges which mean transformed metrics)
-        new_inputs = []
-        for input in merge.inputs:
-            new_inputs.append(
-                RecordsFilterOperator(
-                    query=input, materialized=materialized, drop_last_column=True
+            # add TuplesFilter to each input of the original merge
+            # (excluding merges which mean transformed metrics)
+            new_inputs = []
+            for input in merge.inputs:
+                new_inputs.append(
+                    RecordsFilterOperator(
+                        query=input, materialized=materialized, drop_last_column=True
+                    )
                 )
-            )
-        merge.inputs = new_inputs
+            merge.inputs = new_inputs
 
         return merge
 
@@ -263,13 +265,13 @@ class AddTopBottomLimit(AddLimit):
 class AddTopLimit(AddTopBottomLimit):
     id = "top"
     name = "Top"
-    ascending: bool = False
+    ascending = False
 
 
 class AddBottomLimit(AddTopBottomLimit):
     id = "bottom"
     name = "Bottom"
-    ascending: bool = True
+    ascending = True
 
 
 class AddTotalMetric(AddTransformedMetric):

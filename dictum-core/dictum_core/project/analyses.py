@@ -157,8 +157,14 @@ class Select(Analysis):
         return self
 
     def limit(self, *filters):
-        for f in filters:
-            self.query.limit.append(compile_metric_request(str(f)).metric)
+        if any(isinstance(f, int) for f in filters) and len(filters) > 1:
+            raise ValueError("Integer limit must be the only filter")
+
+        if len(filters) == 1 and isinstance(filters[0], int):
+            self.query.limit = filters[0]
+        else:
+            for f in filters:
+                self.query.limit.append(compile_metric_request(str(f)).metric)
         return self
 
 

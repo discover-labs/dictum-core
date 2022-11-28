@@ -165,14 +165,6 @@ class OrderItem:
 
 
 @dataclass
-class LiteralOrderItem:
-    """Like OrderItem, but by name"""
-
-    name: str
-    ascending: bool
-
-
-@dataclass
 class RelationalQuery(Relation):
     """
     A simple relational query.

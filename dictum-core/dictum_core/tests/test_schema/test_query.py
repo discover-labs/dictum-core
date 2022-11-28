@@ -1,4 +1,5 @@
 from dictum_core.schema.query import (
+    Query,
     QueryDimension,
     QueryDimensionRequest,
     QueryMetric,
@@ -116,4 +117,14 @@ def test_render_query_metric():
             {"id": "test", "transforms": [{"id": "x"}, {"id": "gt", "args": [1]}]}
         ).render()
         == "test.x().gt(1)"
+    )
+
+
+def test_int_limit():
+    Query.parse_obj(
+        {
+            "metrics": [{"metric": {"id": "test"}}],
+            "dimensions": [{"dimension": {"id": "test"}}],
+            "limit": 5,
+        }
     )

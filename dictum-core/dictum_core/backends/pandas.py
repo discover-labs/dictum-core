@@ -8,7 +8,7 @@ from lark import Transformer, Tree
 from dictum_core.backends.base import Compiler
 from dictum_core.backends.mixins.arithmetic import ArithmeticCompilerMixin
 from dictum_core.backends.mixins.datediff import DatediffCompilerMixin
-from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
+from dictum_core.engine import Column, OrderItem, RelationalQuery
 
 
 class PandasColumnTransformer(Transformer):
@@ -200,5 +200,5 @@ class PandasCompiler(ArithmeticCompilerMixin, DatediffCompilerMixin, Compiler):
     def limit(self, query, limit: int):
         raise NotImplementedError
 
-    def order(self, query, items: List[LiteralOrderItem]):
+    def order(self, query, items: List[OrderItem]):
         raise NotImplementedError

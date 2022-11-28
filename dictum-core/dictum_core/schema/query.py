@@ -1,5 +1,5 @@
 from hashlib import md5
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel
 
@@ -159,7 +159,7 @@ class Query(BaseModel):
     metrics: List[QueryMetricRequest] = []
     dimensions: List[QueryDimensionRequest] = []
     filters: List[QueryDimension] = []
-    limit: List[QueryMetric] = []
+    limit: Union[int, List[QueryMetric]] = []
 
     @property
     def digest(self) -> str:

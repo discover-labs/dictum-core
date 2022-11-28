@@ -20,6 +20,7 @@ from dictum_core.project.magics.parser import (
     parse_shorthand_metric,
     parse_shorthand_related,
     parse_shorthand_table,
+    parse_shorthand_union,
 )
 from dictum_core.project.templates import environment
 from dictum_core.project.yaml_mapped_dict import YAMLMappedDict
@@ -392,6 +393,19 @@ class Project:
         self.stage_model_data(update)
         if commit:
             self.commit_model_data()
+
+    def update_shorthand_union(self, definition: str):
+        tree = parse_shorthand_union(definition)
+        id_, type_, *_ = tree.children
+        type_ = type_.children[0]
+        name = next(tree.find_data("alias"), None)
+        if name is not None:
+            name = name.children[0]
+        else:
+            name = id_.replace("_", " ").title()
+        update = {"unions": {id_: {"type": type_, "name": name}}}
+        self.stage_model_data(update)
+        self.commit_model_data()
 
     def stage_model_data(self, update: dict):
         # avoid updating model_data until the staged model is checked

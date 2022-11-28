@@ -73,6 +73,8 @@ class QlTransformer(Transformer):
                 dimensions = item.children
             elif item.data == "limit":
                 limit = item.children
+                if len(limit) == 1 and isinstance(limit[0], int):
+                    limit = limit[0]
         return Query(
             metrics=metrics,
             dimensions=dimensions,

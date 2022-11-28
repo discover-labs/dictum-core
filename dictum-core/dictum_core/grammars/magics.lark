@@ -21,6 +21,8 @@ table_metric: "metric"i metric
 table_dimension: "dimension"i dimension
 table_related: "related"i related
 
+union: identifier "::" type [ "AS"i alias ]
+
 key_value: IDENTIFIER "=" ( identifier | key_values )  // value can be quoted or nested
 key_values: "{" key_value+ "}"
 

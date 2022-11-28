@@ -80,3 +80,7 @@ class ProjectMagics(Magics):
         if cell is None:
             cell = ""
         self.project.update_shorthand_metric(f"{line} {cell}")
+
+    @line_magic
+    def union(self, line: str):
+        self.project.update_shorthand_union(line)

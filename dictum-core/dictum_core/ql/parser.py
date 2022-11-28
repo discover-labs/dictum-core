@@ -38,6 +38,9 @@ class Preprocessor(Transformer):
     def INTEGER(self, value: str):
         return int(value)
 
+    def UINTEGER(self, value: str):
+        return int(value)
+
     def FLOAT(self, value: str):
         return float(value)
 

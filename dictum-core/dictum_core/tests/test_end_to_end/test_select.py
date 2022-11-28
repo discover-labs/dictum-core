@@ -628,3 +628,22 @@ def test_running_sum_multiple(project: Project):
         .df()
     )
     assert df["revenue__running_sum_within_Year"].max() == 481.45
+
+
+def test_literal_limit(project: Project):
+    df = project.select("revenue").by("genre").limit(5).df()
+    assert df.shape == (5, 2)
+
+
+def test_literal_limit_invalid(project: Project):
+    with pytest.raises(ValueError):
+        project.select("revenue").by("genre").limit(1, 2)
+    with pytest.raises(ValueError):
+        project.select("revenue").by("genre").limit(1, project.m.revenue.top(5))
+    with pytest.raises(ValueError):
+        project.select("revenue").by("genre").limit(project.m.revenue.top(5), 42)
+
+
+def test_select_union(project: Project):
+    df = project.select("n_customers").by("country").df()
+    assert df.shape == (24, 2)

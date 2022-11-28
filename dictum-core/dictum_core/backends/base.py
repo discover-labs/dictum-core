@@ -8,7 +8,7 @@ import pkg_resources
 from lark import Token, Transformer
 from pandas import DataFrame
 
-from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
+from dictum_core.engine import Column, OrderItem, RelationalQuery
 
 
 @dataclass
@@ -399,7 +399,7 @@ class Compiler(ABC):
         """Limit a query (mostly user with order)."""
 
     @abstractmethod
-    def order(self, query, items: List[LiteralOrderItem]):
+    def order(self, query, items: List[OrderItem]):
         """Add ordering to a query."""
 
 
@@ -497,7 +497,7 @@ class Backend(ABC):
     def limit(self, query, limit: int):
         return self.compiler.limit(query, limit)
 
-    def order(self, query, items: List[LiteralOrderItem]):
+    def order(self, query, items: List[OrderItem]):
         return self.compiler.order(query, items)
 
     @abstractmethod

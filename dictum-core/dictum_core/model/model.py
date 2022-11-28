@@ -228,7 +228,7 @@ class Model:
         table.dimensions[result.id] = result
         if union is not None:
             if union in table.dimensions:
-                raise KeyError(
+                raise KeyError(  # TODO: move to checks
                     f"Duplicate union dimension {union} " f"on table {table.id}"
                 )
             union: DimensionsUnion = self.dimensions.get(union)
