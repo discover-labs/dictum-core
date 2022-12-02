@@ -419,7 +419,7 @@ class Model:
     #         ]
     #     )
 
-    def get_currencies_for_query(self, query: schema.Query):
+    def get_currencies_for_query(self, query):
         currencies = set()
         for request in query.metrics:
             metric = self.metrics.get(request.metric.id)

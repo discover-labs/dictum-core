@@ -203,6 +203,7 @@ class MergeOperator(Operator, MaterializeMixin):
         self.inputs = inputs if inputs is not None else []
         self.dimensions: List[Column] = []
         self.metrics: List[Column] = []
+        self.filters: List[Tree] = []
         self.limit: Optional[int] = None
         self.order: Optional[List[engine.OrderItem]] = []
 
@@ -256,7 +257,23 @@ class MergeOperator(Operator, MaterializeMixin):
         if merge.digest not in self.digests:
             self.inputs.append(merge)
 
-    def calculate_pandas(self, input: List[list]) -> List[list]:
+    def filter_pandas(self, input: DataFrame) -> DataFrame:
+        if len(self.filters) == 0:
+            return input
+
+        column_transformer = PandasColumnTransformer({None: input})
+        compiler = PandasCompiler()
+
+        filters = []
+        for expr in self.filters:
+            expr_with_columns = column_transformer.transform(expr)
+            filter_expr = compiler.transformer.transform(expr_with_columns)
+            filters.append(filter_expr)
+
+        filter_ = concat(filters, axis=1).all(axis=1)
+        return input.loc[filter_]
+
+    def calculate_pandas(self, input: DataFrame) -> DataFrame:
         column_transformer = PandasColumnTransformer({None: input})
         compiler = PandasCompiler()
         columns = []
@@ -345,9 +362,10 @@ class MergeOperator(Operator, MaterializeMixin):
             result = results[0]
 
         if isinstance(result, DataFrame):
+            result = self.filter_pandas(result)
             return self.calculate_pandas(result)
 
-        result = backend.calculate(result, self.columns)
+        result = backend.calculate(result, self.columns, filters=self.filters)
 
         # TODO: support order in the query
         if self.order:

@@ -5,7 +5,7 @@ from functools import cached_property, wraps
 from typing import Any, Dict, List, Optional
 
 import pkg_resources
-from lark import Token, Transformer
+from lark import Token, Transformer, Tree
 from pandas import DataFrame
 
 from dictum_core.engine import Column, OrderItem, RelationalQuery
@@ -375,11 +375,13 @@ class Compiler(ABC):
         """
 
     @abstractmethod
-    def calculate(self, query, columns: List[Column]):
+    def calculate(
+        self, query, columns: List[Column], filters: Optional[List[Tree]] = None
+    ):
         """Calculate expressions from the fields of a query"""
 
     @abstractmethod
-    def filter(self, query, conditions: Dict[str, Any]):
+    def filter(self, query, conditions: List[Tree]):
         """Filter a query on a list of conditions"""
 
     @abstractmethod
@@ -482,10 +484,12 @@ class Backend(ABC):
     def merge_queries(self, queries: List, merge_on: List[str]):
         return self.compiler.merge_queries(queries, merge_on)
 
-    def calculate(self, query, columns: List[Column]):
-        return self.compiler.calculate(query, columns)
+    def calculate(
+        self, query, columns: List[Column], filters: Optional[List[Tree]] = None
+    ):
+        return self.compiler.calculate(query, columns, filters=filters)
 
-    def filter(self, query, conditions: Dict[str, Any]):
+    def filter(self, query, conditions: List[Tree]):
         return self.compiler.filter(query, conditions)
 
     def filter_with_records(self, query, records: List[List[Dict[str, Any]]]):

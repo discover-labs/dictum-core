@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from lark import Token, Tree
 
@@ -15,6 +15,7 @@ from dictum_core.engine.operators import (
 from dictum_core.engine.result import DisplayInfo
 from dictum_core.format import Format
 from dictum_core.model import Metric, Model
+from dictum_core.model.scalar import transforms as scalar_transforms
 from dictum_core.model.types import Type
 from dictum_core.schema import (
     FormatConfig,
@@ -32,15 +33,19 @@ class AddMetric:
     - For each measure of the metric
       - Add the measure aggregation to the merge (if it's not already there)
     - Add the necessary calculation to the merge.
+
+    If as_filter set to True, the metric is added to the filters, not the select list.
     """
 
     def __init__(
         self,
         request: QueryMetricRequest,
         builder: Optional[AggregateQueryBuilder] = None,
+        as_filter: bool = False,
     ):
         self.request = request
         self.builder = builder
+        self.as_filter = as_filter
 
     @property
     def model(self) -> Model:
@@ -82,14 +87,26 @@ class AddMetric:
             ),
         )
 
+    def transform_metric_column(self, column: Column):
+        for transform in self.request.metric.transforms:
+            transformer = scalar_transforms[transform.id](*transform.args)
+            column = transformer(column)
+        return column
+
     def __call__(self, merge: MergeOperator):
         merge = self.add_measures(merge)
         column = self.get_metric_column()
+        column = self.transform_metric_column(column)
+
+        if self.as_filter:
+            merge.filters.append(column.expr)
+            return merge
+
         merge.metrics.append(column)
         return merge
 
 
-transforms = {}
+transforms: Dict[str, "AddTransformedMetric"] = {}
 
 
 class AddTransformedMetric(AddMetric):
@@ -99,7 +116,7 @@ class AddTransformedMetric(AddMetric):
 
     @property
     def transform(self):
-        return self.request.metric.transforms[0]
+        return self.request.metric.transform
 
     def get_transform_terminal(
         self,
@@ -147,15 +164,8 @@ class AddTransformedMetric(AddMetric):
         ]
 
 
-limit_transforms = {}
-
-
 class AddLimit(AddTransformedMetric):
     """A metric adder user for transforms that are only used in query's limit clause"""
-
-    def __init_subclass__(cls) -> None:
-        if hasattr(cls, "id"):
-            limit_transforms[cls.id] = cls
 
 
 class AddTopBottomLimit(AddLimit):
@@ -179,11 +189,6 @@ class AddTopBottomLimit(AddLimit):
     """
 
     ascending: bool
-
-    def __init__(
-        self, metric: QueryMetric, builder: Optional[AggregateQueryBuilder] = None
-    ):
-        super().__init__(QueryMetricRequest(metric=metric), builder)
 
     def wrap_in_row_number(self, merge: MergeOperator, within: List[QueryDimension]):
         """Add row_number to the terminal operator."""
@@ -298,7 +303,7 @@ class AddTotalMetric(AddTransformedMetric):
         return QueryMetricRequest(
             metric=QueryMetric(
                 id=self.metric.id,
-                transforms=[QueryTableTransform(id="total", within=dimensions)],
+                transform=QueryTableTransform(id="total", within=dimensions),
             )
         )
 
@@ -327,6 +332,12 @@ class AddTotalMetric(AddTransformedMetric):
                 kind="metric",
             ),
         )
+        column = self.transform_metric_column(column)
+
+        if self.as_filter:
+            merge.filters.append(column.expr)
+            return merge
+
         merge.metrics.append(column)
         return merge
 
@@ -396,7 +407,7 @@ class AddPercentMetric(AddTotalMetric):
             dimensions = [*self.transform.of, *self.transform.within]
             numerator_terminal = self.get_transform_terminal(
                 request=self.get_total_metric_request(dimensions),
-                dimensions=self.transform.of + self.transform.within,
+                dimensions=dimensions,
             )
             numerator = Tree("column", [None, numerator_terminal.metrics[0].name])
             merge.add_merge(numerator_terminal)
@@ -431,6 +442,12 @@ class AddPercentMetric(AddTotalMetric):
                 kind="metric",
             ),
         )
+        column = self.transform_metric_column(column)
+
+        if self.as_filter:
+            merge.filters.append(column.expr)
+            return merge
+
         merge.metrics.append(column)
         return merge
 

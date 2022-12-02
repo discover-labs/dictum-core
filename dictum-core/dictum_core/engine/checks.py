@@ -1,6 +1,7 @@
 from itertools import chain
 
 from dictum_core.engine.metrics import transforms as table_transforms
+from dictum_core.engine.query import Query
 from dictum_core.exceptions import (
     DuplicateColumnError,
     MissingQueryDimensionError,
@@ -8,11 +9,11 @@ from dictum_core.exceptions import (
     MissingScalarTransformError,
     MissingTableTransformDimensionError,
     MissingTableTransformError,
+    MisusedTableTransformError,
     ScalarTransformTypeError,
 )
 from dictum_core.model import Model
 from dictum_core.ordered_check_caller import OrderedCheckCaller
-from dictum_core.schema.query import Query
 
 check_query = OrderedCheckCaller()
 
@@ -34,8 +35,10 @@ def _check_dimensions_exist(model: Model, query: Query):
     for dimension in query.filters:
         _check_dimension_exists(dimension.id, model)
     for request in query.metrics:
-        for transform in request.metric.transforms:
-            for dimension in chain(transform.within, transform.of):
+        if request.metric.transform:
+            for dimension in chain(
+                request.metric.transform.within, request.metric.transform.of
+            ):
                 _check_dimension_exists(dimension.id, model)
 
 
@@ -52,11 +55,36 @@ def _check_scalar_transforms_exist(model: Model, query: Query):
 @check_query.depends_on(_check_metrics_exist)
 def _check_table_transforms_exist(model: Model, query: Query):
     for request in query.metrics:
-        for transform in request.metric.transforms:
-            if transform.id not in table_transforms:
-                raise MissingTableTransformError(
-                    f"Table transform {transform.id} does not exist"
-                )
+        if (
+            request.metric.transform
+            and request.metric.transform.id not in table_transforms
+        ):
+            raise MissingTableTransformError(
+                f"Table transform {request.metric.transform.id} does not exist"
+            )
+
+
+@check_query.depends_on(_check_table_transforms_exist)
+def _check_top_bottom_usage(model: Model, query: Query):
+    top_bottom = {"top", "bottom"}
+    for request in query.metrics:
+        if (
+            request.metric.transform is not None
+            and request.metric.transform.id in top_bottom
+        ):
+            raise MisusedTableTransformError(
+                "top/bottom transforms can only be used as table filters, "
+                "found in metrics"
+            )
+    for metric in query.table_filters:
+        if (
+            metric.transform is not None
+            and metric.transform.id in top_bottom
+            and len(metric.transforms) > 0
+        ):
+            raise MisusedTableTransformError(
+                "top/bottom table transforms can't be combined with other transforms"
+            )
 
 
 @check_query.depends_on(
@@ -95,7 +123,8 @@ def _check_of_within_in_dimensions(model: Model, query: Query):
         dimension_digests.add(request.dimension.digest)
 
     for request in query.metrics:
-        for transform in request.metric.transforms:
+        if request.metric.transform:
+            transform = request.metric.transform
             for dimension in chain(transform.of, transform.within):
                 if dimension.digest not in dimension_digests:
                     raise MissingTableTransformDimensionError(
@@ -104,7 +133,11 @@ def _check_of_within_in_dimensions(model: Model, query: Query):
                     )
 
 
-@check_query.depends_on(_check_scalar_transforms_exist, _check_of_within_in_dimensions)
+@check_query.depends_on(
+    _check_dimensions_exist,
+    _check_scalar_transforms_exist,
+    _check_of_within_in_dimensions,
+)
 def _check_scalar_transform_types(model: Model, query: Query):
     for request in query.dimensions:
         dimension = model.dimensions[request.dimension.id]

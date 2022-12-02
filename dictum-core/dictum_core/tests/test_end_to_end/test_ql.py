@@ -9,7 +9,7 @@ def test_ql_query(project: Project):
     query = """
     select revenue.percent() as "Percent of Revenue"
     by invoice_date.year as Year, artist
-    limit revenue.top(1) of (artist) within (invoice_date.year)
+    having revenue.top(1) of (artist) within (invoice_date.year)
     """
     ql = project.ql(query)
     result = ql.df()

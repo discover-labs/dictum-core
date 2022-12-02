@@ -8,6 +8,7 @@ from dictum_core.project.formatting import Formatter
 from dictum_core.ql import (
     compile_dimension,
     compile_dimension_request,
+    compile_metric,
     compile_metric_request,
     compile_query,
 )
@@ -156,15 +157,13 @@ class Select(Analysis):
             self.query.filters.append(compile_dimension(str(f)))
         return self
 
-    def limit(self, *filters):
-        if any(isinstance(f, int) for f in filters) and len(filters) > 1:
-            raise ValueError("Integer limit must be the only filter")
+    def having(self, *filters):
+        for f in filters:
+            self.query.table_filters.append(compile_metric(str(f)))
+        return self
 
-        if len(filters) == 1 and isinstance(filters[0], int):
-            self.query.limit = filters[0]
-        else:
-            for f in filters:
-                self.query.limit.append(compile_metric_request(str(f)).metric)
+    def limit(self, n: int):
+        self.query.limit = n
         return self
 
 

@@ -1,13 +1,6 @@
 from lark import Transformer, Tree
 
-from dictum_core.ql.parser import (
-    parse_dimension,
-    parse_dimension_request,
-    parse_metric,
-    parse_metric_request,
-    parse_ql,
-)
-from dictum_core.schema.query import (
+from dictum_core.engine.query import (
     Query,
     QueryDimension,
     QueryDimensionRequest,
@@ -15,6 +8,13 @@ from dictum_core.schema.query import (
     QueryMetricRequest,
     QueryScalarTransform,
     QueryTableTransform,
+)
+from dictum_core.ql.parser import (
+    parse_dimension_expr,
+    parse_dimension_request,
+    parse_metric_expr,
+    parse_metric_request,
+    parse_ql,
 )
 
 
@@ -37,7 +37,11 @@ class QlTransformer(Transformer):
 
     def metric(self, children: list):
         id, *transforms = children
-        return QueryMetric(id=id, transforms=transforms)
+        transform = next(
+            (t for t in transforms if isinstance(t, QueryTableTransform)), None
+        )
+        transforms = [t for t in transforms if isinstance(t, QueryScalarTransform)]
+        return QueryMetric(id=id, transform=transform, transforms=transforms)
 
     def scalar_transform(self, children: list):
         id, *args = children
@@ -65,20 +69,21 @@ class QlTransformer(Transformer):
 
     def query(self, children: list):
         metrics, *rest = children
-        filters, dimensions, limit = [], [], []
+        filters, dimensions, table_filters, limit = [], [], [], None
         for item in rest:
             if item.data == "where":
                 filters = item.children
             elif item.data == "groupby":
                 dimensions = item.children
+            elif item.data == "having":
+                table_filters = item.children
             elif item.data == "limit":
-                limit = item.children
-                if len(limit) == 1 and isinstance(limit[0], int):
-                    limit = limit[0]
+                limit = item.children[0]
         return Query(
             metrics=metrics,
             dimensions=dimensions,
             filters=filters,
+            table_filters=table_filters,
             limit=limit,
         )
 
@@ -91,7 +96,7 @@ def compile_query(query: str) -> Query:
 
 
 def compile_dimension(expr: str) -> QueryDimension:
-    return ql_transformer.transform(parse_dimension(expr))
+    return ql_transformer.transform(parse_dimension_expr(expr))
 
 
 def compile_dimension_request(expr: str) -> QueryDimensionRequest:
@@ -99,7 +104,7 @@ def compile_dimension_request(expr: str) -> QueryDimensionRequest:
 
 
 def compile_metric(expr: str) -> QueryMetric:
-    return ql_transformer.transform(parse_metric(expr))
+    return ql_transformer.transform(parse_metric_expr(expr))
 
 
 def compile_metric_request(expr: str) -> QueryMetricRequest:

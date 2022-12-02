@@ -18,7 +18,7 @@ def value_to_token(value):
     if isinstance(value, int):
         return Token("INTEGER", str(value))
     if isinstance(value, float):
-        return Token("NUMBER", str(value))
+        return Token("FLOAT", str(value))
     if isinstance(value, str):
         return Token("STRING", value)
     if isinstance(value, date):

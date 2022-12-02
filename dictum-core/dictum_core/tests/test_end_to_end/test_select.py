@@ -133,7 +133,7 @@ def test_top_with_measure_basic(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre)
-        .limit(project.m.revenue.top(5))
+        .having(project.m.revenue.top(5))
         .df()
     )
     assert set(result.genre) == {
@@ -149,7 +149,7 @@ def test_top_with_metrics_basic(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre)
-        .limit(project.m.revenue_per_track.top(5))
+        .having(project.m.revenue_per_track.top(5))
         .df()
     )
     assert set(result.genre) == {
@@ -165,7 +165,7 @@ def test_top_with_multiple_basic(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre)
-        .limit(
+        .having(
             project.m.revenue.top(10),
             project.m.revenue_per_track.top(10),
         )
@@ -185,7 +185,7 @@ def test_top_with_multiple_basic_reverse_order(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre)
-        .limit(
+        .having(
             project.m.revenue_per_track.top(10),
             project.m.revenue.top(10),
         )
@@ -205,7 +205,7 @@ def test_top_with_measure_basic_metric(project: Project):
     result = (
         project.select(project.m.revenue_per_track)
         .by(project.d.genre)
-        .limit(project.m.revenue.top(5))
+        .having(project.m.revenue.top(5))
         .df()
     )
     assert set(result.genre) == {
@@ -221,7 +221,7 @@ def test_top_with_metric_basic_metric(project: Project):
     result = (
         project.select(project.m.revenue_per_track)
         .by(project.d.genre)
-        .limit(project.m.revenue_per_track.top(5))
+        .having(project.m.revenue_per_track.top(5))
         .df()
     )
     assert set(result.genre) == {
@@ -237,7 +237,7 @@ def test_top_with_multiple_basic_metric(project: Project):
     result = (
         project.select(project.m.revenue_per_track)
         .by(project.d.genre)
-        .limit(
+        .having(
             project.m.revenue.top(10),
             project.m.revenue_per_track.top(10),
         )
@@ -257,7 +257,7 @@ def test_top_with_multiple_basic_metric_reverse_order(project: Project):
     result = (
         project.select(project.m.revenue_per_track)
         .by(project.d.genre)
-        .limit(
+        .having(
             project.m.revenue_per_track.top(10),
             project.m.revenue.top(10),
         )
@@ -277,7 +277,7 @@ def test_top_with_measure_within(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre, project.d.artist)
-        .limit(project.m.revenue.top(3, within=[project.d.genre]))
+        .having(project.m.revenue.top(3, within=[project.d.genre]))
         .df()
     )
     assert result.shape == (56, 3)
@@ -287,7 +287,7 @@ def test_top_with_measure_within_of(project: Project):
     result = (
         project.select(project.m.revenue)
         .by(project.d.genre, project.d.artist)
-        .limit(
+        .having(
             project.m.revenue.top(3, within=[project.d.genre]),
             project.m.revenue.top(3, of=[project.d.genre]),
         )
@@ -301,7 +301,7 @@ def test_top_with_metric_within_of(project: Project):
     result = (
         project.select(project.m.revenue, project.m.revenue_per_track)
         .by(project.d.genre, project.d.artist)
-        .limit(
+        .having(
             project.m.revenue_per_track.top(3, within=[project.d.genre]),
             project.m.revenue_per_track.top(3, of=[project.d.genre]),
         )
@@ -314,7 +314,7 @@ def test_tops_with_total(project: Project, engine):
     result = (
         project.select("revenue", "revenue.total")
         .by("customer_country", "customer_city")
-        .limit(
+        .having(
             "revenue.top(3) of (customer_country)",
             "revenue.top(1) of (customer_city) within (customer_country)",
         )
@@ -328,7 +328,7 @@ def test_tops_with_total_within(project: Project):
         """
     select revenue, revenue.total within (customer_country)
     by customer_country, customer_city
-    limit revenue.top(5) of (customer_country),
+    having revenue.top(5) of (customer_country),
         revenue.top(1) of (customer_city) within (customer_country)
     """
     ).df()
@@ -342,7 +342,7 @@ def test_tops_with_matching_total_and_percent(project: Project):
         revenue.percent of (customer_city) as "% of City Revenue",
         revenue.total within (customer_country) as "Total Revenue: Country"
     by customer_country, customer_city
-    limit revenue.top(5) of (customer_country),
+    having revenue.top(5) of (customer_country),
         revenue.top(1) of (customer_city) within (customer_country)
     """
     ).df()
@@ -366,7 +366,7 @@ def test_total_metric(project: Project):
             project.m.revenue_per_track.total(within=[project.d.genre]),
         )
         .by(project.d.genre, project.d.artist)
-        .limit(project.m.revenue.top(3, within=[project.d.genre]))
+        .having(project.m.revenue.top(3, within=[project.d.genre]))
     )
     result = select.df()
     assert result.shape == (56, 4)
@@ -440,7 +440,7 @@ def test_percent_with_top(project: Project):
     result = (
         project.select(project.m.revenue.percent())
         .by(project.d.genre)
-        .limit(project.m.revenue.top(5))
+        .having(project.m.revenue.top(5))
         .df()
     )
     assert result.shape == (5, 2)
@@ -455,7 +455,7 @@ def test_percent_with_top_within(project: Project):
             )
         )
         .by(project.d.genre, project.d.artist)
-        .limit(project.m.revenue.top(1, within=[project.d.genre]))
+        .having(project.m.revenue.top(1, within=[project.d.genre]))
         .df()
     )
     assert result.shape == (24, 3)
@@ -635,15 +635,29 @@ def test_literal_limit(project: Project):
     assert df.shape == (5, 2)
 
 
-def test_literal_limit_invalid(project: Project):
-    with pytest.raises(ValueError):
-        project.select("revenue").by("genre").limit(1, 2)
-    with pytest.raises(ValueError):
-        project.select("revenue").by("genre").limit(1, project.m.revenue.top(5))
-    with pytest.raises(ValueError):
-        project.select("revenue").by("genre").limit(project.m.revenue.top(5), 42)
-
-
 def test_select_union(project: Project):
     df = project.select("n_customers").by("country").df()
     assert df.shape == (24, 2)
+
+
+def test_select_having_metric(project: Project):
+    df = project.select("revenue").by("genre").having("revenue > 100").df()
+    assert df.shape == (4, 2)
+
+    df = (
+        project.select("revenue", "revenue.total")
+        .by("genre")
+        .having("revenue > 100")
+        .df()
+    )
+    assert df.shape == (4, 3)
+
+
+def test_select_having_table_transform(project: Project):
+    df = (
+        project.select("revenue", "revenue.percent")
+        .by("genre")
+        .having("revenue.percent >= 0.01")
+        .df()
+    )
+    assert df.shape == (13, 3)

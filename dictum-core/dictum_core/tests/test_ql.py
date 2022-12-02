@@ -1,8 +1,14 @@
 from lark import Tree
 
+from dictum_core.engine.query import (
+    Query,
+    QueryDimension,
+    QueryDimensionRequest,
+    QueryMetricRequest,
+)
 from dictum_core.ql import compile_query
 from dictum_core.ql.parser import (
-    parse_dimension,
+    parse_dimension_expr,
     parse_dimension_request,
     parse_metric_request,
     parse_ql,
@@ -11,12 +17,6 @@ from dictum_core.ql.transformer import (
     compile_dimension,
     compile_dimension_request,
     compile_metric_request,
-)
-from dictum_core.schema.query import (
-    Query,
-    QueryDimension,
-    QueryDimensionRequest,
-    QueryMetricRequest,
 )
 
 
@@ -377,7 +377,7 @@ def test_compile_dimension_transform_alias():
 
 
 def test_parse_filter():
-    assert parse_dimension("x.y('z')") == Tree(
+    assert parse_dimension_expr("x.y('z')") == Tree(
         "dimension", ["x", Tree("scalar_transform", ["y", "z"])]
     )
 
@@ -389,10 +389,10 @@ def test_compile_filter():
 
 
 def test_filter_null():
-    assert parse_dimension("x is null") == Tree(
+    assert parse_dimension_expr("x is null") == Tree(
         "dimension", ["x", Tree("scalar_transform", ["isnull"])]
     )
-    assert parse_dimension("x is not null") == Tree(
+    assert parse_dimension_expr("x is not null") == Tree(
         "dimension", ["x", Tree("scalar_transform", ["isnotnull"])]
     )
 
@@ -465,17 +465,15 @@ def test_compile_metric_request():
         {
             "metric": {
                 "id": "x",
-                "transforms": [
-                    {
-                        "id": "y",
-                        "args": [1, "f"],
-                        "of": [{"id": "a"}],
-                        "within": [
-                            {"id": "b"},
-                            {"id": "c", "transforms": [{"id": "n", "args": [1]}]},
-                        ],
-                    }
-                ],
+                "transform": {
+                    "id": "y",
+                    "args": [1, "f"],
+                    "of": [{"id": "a"}],
+                    "within": [
+                        {"id": "b"},
+                        {"id": "c", "transforms": [{"id": "n", "args": [1]}]},
+                    ],
+                },
             },
             "alias": "al",
         }
@@ -483,7 +481,7 @@ def test_compile_metric_request():
 
 
 def test_parse_unary_not():
-    assert parse_dimension("x.y(1).not") == Tree(
+    assert parse_dimension_expr("x.y(1).not") == Tree(
         "dimension",
         [
             "x",
@@ -499,5 +497,56 @@ def test_parse_literal_limit():
             "metrics": [{"metric": {"id": "a"}}],
             "dimensions": [{"dimension": {"id": "b"}}],
             "limit": 5,
+        }
+    )
+
+
+def test_parse_having():
+    assert parse_ql(
+        "select revenue by genre having revenue.percent > 0.5 limit 5"
+    ) == Tree(
+        "query",
+        [
+            Tree("select", [Tree("metric_request", [Tree("metric", ["revenue"])])]),
+            Tree(
+                "groupby", [Tree("dimension_request", [Tree("dimension", ["genre"])])]
+            ),
+            Tree(
+                "having",
+                [
+                    Tree(
+                        "metric",
+                        [
+                            "revenue",
+                            Tree("table_transform", ["percent"]),
+                            Tree("scalar_transform", ["gt", 0.5]),
+                        ],
+                    )
+                ],
+            ),
+            Tree("limit", [5]),
+        ],
+    )
+
+
+def test_compile_having():
+    assert compile_query("select x by y having z.a > .5 limit 2") == Query.parse_obj(
+        {
+            "metrics": [
+                {
+                    "alias": None,
+                    "metric": {"id": "x", "transforms": [], "transform": None},
+                }
+            ],
+            "dimensions": [{"alias": None, "dimension": {"id": "y", "transforms": []}}],
+            "filters": [],
+            "table_filters": [
+                {
+                    "id": "z",
+                    "transforms": [{"id": "gt", "args": [0.5]}],
+                    "transform": {"id": "a", "args": [], "of": [], "within": []},
+                }
+            ],
+            "limit": 2,
         }
     )

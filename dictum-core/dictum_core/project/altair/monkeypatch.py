@@ -36,6 +36,7 @@ from jsonschema.exceptions import ValidationError
 from toolz.curried import curry
 
 from dictum_core.engine.computation import DisplayInfo
+from dictum_core.engine.query import Query, QueryMetricRequest
 from dictum_core.project.altair.data import DictumData
 from dictum_core.project.altair.encoding import AltairEncodingChannelHook, filter_fields
 from dictum_core.project.altair.locale import (
@@ -43,7 +44,6 @@ from dictum_core.project.altair.locale import (
     cldr_locale_to_d3_time,
 )
 from dictum_core.ql.transformer import compile_dimension_request, compile_metric_request
-from dictum_core.schema.query import Query, QueryMetricRequest
 
 
 def is_channel_cls(obj):

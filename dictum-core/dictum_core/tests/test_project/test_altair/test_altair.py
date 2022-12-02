@@ -1,5 +1,6 @@
 import altair as alt
 
+from dictum_core.engine.query import Query
 from dictum_core.project.altair.data import DictumData
 from dictum_core.project.altair.monkeypatch import (
     is_dictum_definition,
@@ -8,7 +9,6 @@ from dictum_core.project.altair.monkeypatch import (
     requests_from_channel,
 )
 from dictum_core.project.project import Project
-from dictum_core.schema.query import Query
 
 monkeypatch_altair()
 

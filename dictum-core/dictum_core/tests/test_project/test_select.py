@@ -38,6 +38,6 @@ def test_select_str(project: Project):
 @pytest.mark.xfail
 def test_top_order(project: Project):
     # TODO: fix this
-    df = project.select("revenue").by("country").limit("revenue.top(5)").df()
+    df = project.select("revenue").by("country").having("revenue.top(5)").df()
     assert df.shape == (5, 2)
     assert df["revenue"].iloc[0] == df["revenue"].max()

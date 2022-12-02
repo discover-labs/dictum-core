@@ -212,6 +212,10 @@ class MissingTableTransformDimensionError(QueryError):
     """When transforms listed in of/within are not present in the query"""
 
 
+class MisusedTableTransformError(QueryError):
+    """Subj. e.g. when TOP is used in the select list or with scalars"""
+
+
 class ScalarTransformTypeError(QueryError):
     """When there's funky business with scalar transform input types"""
 

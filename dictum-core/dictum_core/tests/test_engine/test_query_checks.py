@@ -9,6 +9,7 @@ from dictum_core.exceptions import (
     MissingScalarTransformError,
     MissingTableTransformDimensionError,
     MissingTableTransformError,
+    MisusedTableTransformError,
     ScalarTransformTypeError,
 )
 from dictum_core.model import Model
@@ -23,6 +24,7 @@ def query(project: Project):
     select revenue, revenue.percent within (invoice_date.year)
     where genre = 'Rock'
     by invoice_date.year, invoice_date.quarter
+    having revenue.percent within (invoice_date.year) > 1
     """
     ).query
 
@@ -55,7 +57,7 @@ def test_check_dimensions_exist_checks_filters(model: Model, query: Query):
 
 
 def test_check_dimensions_exist_checks_of_within(model: Model, query: Query):
-    query.metrics[1].metric.transforms[0].within[0].id = "missing"
+    query.metrics[1].metric.transform.within[0].id = "missing"
     with pytest.raises(MissingQueryDimensionError):
         check_query(model, query)
 
@@ -67,7 +69,7 @@ def test_check_scalar_transforms_exist(model: Model, query: Query):
 
 
 def test_check_table_transforms_exist(model: Model, query: Query):
-    query.metrics[1].metric.transforms[0].id = "missing"
+    query.metrics[1].metric.transform.id = "missing"
     with pytest.raises(MissingTableTransformError):
         check_query(model, query)
 
@@ -83,7 +85,7 @@ def test_check_scalar_transform_types(model: Model, query: Query):
     dimension.transforms[0].id = "step"
     dimension.transforms[0].args = [10]
     query.dimensions[0].dimension = dimension
-    query.metrics[1].metric.transforms[0].within[0] = dimension
+    query.metrics[1].metric.transform.within[0] = dimension
     with pytest.raises(ScalarTransformTypeError):
         check_query(model, query)
 
@@ -102,4 +104,16 @@ def test_check_dimension_join_paths(model: Model):
 def test_check_duplicate_columns(model: Model, query: Query):
     query.dimensions[0].alias = "revenue"
     with pytest.raises(DuplicateColumnError):
+        check_query(model, query)
+
+
+def test_check_top_bottom_usage_top_in_select(model: Model, query: Query):
+    query.metrics[1].metric.transform.id = "top"
+    with pytest.raises(MisusedTableTransformError, match="found in metrics"):
+        check_query(model, query)
+
+
+def test_check_top_bottom_usage_with_scalar(model: Model, query: Query):
+    query.table_filters[0].transform.id = "top"
+    with pytest.raises(MisusedTableTransformError, match="with other transforms"):
         check_query(model, query)

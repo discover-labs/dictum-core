@@ -46,7 +46,7 @@ def get_case_insensitive_column(obj, column: str):
     for k, v in columns.items():
         if k.lower() == column.lower():
             return v
-    raise KeyError(f"Can't find column {column} in {obj.name}")
+    raise KeyError(f"Can't find column {column} in {obj}")
 
 
 class ColumnTransformer(Transformer):
@@ -306,15 +306,30 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
 
         return select(*columns).select_from(joined)
 
-    def calculate(self, query: Select, columns: List[Column]) -> Select:
-        result_columns = []
+    def calculate(
+        self,
+        query: Select,
+        columns: List[Column],
+        filters: Optional[List[Tree]] = None,
+    ) -> Select:
         subquery = query.subquery()
         transformer = ColumnTransformer({None: subquery})
+
+        result_filters = []
+        if filters:
+            for expr in filters:
+                sql_filter = self.transformer.transform(transformer.transform(expr))
+                result_filters.append(sql_filter)
+
+            # subquery = subquery.where(*result_filters)
+
+        result_columns = []
         for column in columns:
             resolved_column = transformer.transform(column.expr)
             sql_expr = self.transformer.transform(resolved_column).label(column.name)
             result_columns.append(sql_expr)
-        return select(*result_columns).select_from(subquery)
+
+        return select(*result_columns).select_from(subquery).where(*result_filters)
 
     def inner_join(self, query: Select, to_join: Select, join_on: List[str]):
         to_join = to_join.subquery()

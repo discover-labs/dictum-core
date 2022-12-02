@@ -27,7 +27,7 @@ class DictumData:
             if req not in query.metrics:
                 query.metrics.append(req)
         query.filters.extend(self.filters)
-        query.limit.extend(self.limits)
+        query.table_filters.extend(self.limits)
         return query
 
     def get_values(self, query):

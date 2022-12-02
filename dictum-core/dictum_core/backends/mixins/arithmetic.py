@@ -5,6 +5,9 @@ class ArithmeticCompilerMixin:
     def INTEGER(self, value: str):
         return int(value)
 
+    def UINTEGER(self, value: str):
+        return int(value)
+
     def STRING(self, value: str):
         return value
 
@@ -15,7 +18,7 @@ class ArithmeticCompilerMixin:
         return False
 
     def exp(self, a, b):
-        return a ** b
+        return a**b
 
     def neg(self, value):
         return -value

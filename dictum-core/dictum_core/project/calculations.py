@@ -5,12 +5,8 @@ import altair as alt
 
 import dictum_core.model
 import dictum_core.project
-from dictum_core.engine.metrics import limit_transforms
 from dictum_core.engine.metrics import transforms as table_transforms
-from dictum_core.model.scalar import transforms as scalar_transforms
-from dictum_core.project.altair.encoding import AltairEncodingChannelHook
-from dictum_core.project.templates import environment, lineage_spec
-from dictum_core.schema.query import (
+from dictum_core.engine.query import (
     QueryDimension,
     QueryDimensionRequest,
     QueryMetric,
@@ -18,9 +14,12 @@ from dictum_core.schema.query import (
     QueryScalarTransform,
     QueryTableTransform,
 )
+from dictum_core.model.scalar import transforms as scalar_transforms
+from dictum_core.project.altair.encoding import AltairEncodingChannelHook
+from dictum_core.project.templates import environment, lineage_spec
 
 scalar_transforms = set(scalar_transforms)
-table_transforms = set(table_transforms) | set(limit_transforms)
+table_transforms = set(table_transforms)
 
 
 class ProjectCalculation(AltairEncodingChannelHook):
