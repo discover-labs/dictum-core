@@ -190,3 +190,35 @@ def test_update_shorthand_union_named(empty: Project):
 
     assert "country" in empty.model.dimensions
     assert empty.model.dimensions["country"].name == "Ctry"
+
+
+def test_missing_integer(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_metric(
+        "invoice_items.revenue = sum(Quantity * UnitPrice) { missing=0 }"
+    )
+
+    assert isinstance(empty.model.metrics["revenue"].missing, int)
+    assert empty.model.metrics["revenue"].missing == 0
+
+
+def test_missing_float(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_metric(
+        "invoice_items.revenue = sum(Quantity * UnitPrice) { missing=0.0 }"
+    )
+
+    assert isinstance(empty.model.metrics["revenue"].missing, float)
+    assert empty.model.metrics["revenue"].missing == 0.0
+
+
+def test_create_measure(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_measure("invoice_items.xxx = sum(aaa)")
+
+    assert "xxx" in empty.model.measures
+
+
+def test_create_table_measure(empty: Project):
+    empty.update_shorthand_table("invoice_items measure xxx = sum(aaa)")
+    assert "xxx" in empty.model.measures

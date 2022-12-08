@@ -30,6 +30,7 @@ class Model:
         self.locale = "en_US"
         self.scalar_transforms = scalar_transforms
         self.theme = None
+        self.currency = None
 
         self.tables: Dict[str, Table] = {}
         self.measures: Dict[str, Measure] = {}
@@ -41,12 +42,14 @@ class Model:
         from dictum_core.model.checks import check_model
         from dictum_core.schema.model.checks import check_model_config
 
-        check_model_config(model)
+        # TODO: turn on
+        # check_model_config(model)
 
         obj = cls(name=model.name)
         obj.description = model.description
         obj.locale = model.locale
         obj.theme = model.theme
+        obj.currency = model.currency
 
         # add unions
         for id_, union in model.unions.items():
@@ -58,7 +61,7 @@ class Model:
                     type=union_type,
                     config=union.format,
                     locale=obj.locale,
-                    default_currency=model.currency,
+                    default_currency=obj.currency,
                 ),
                 type=union_type,
             )
@@ -88,7 +91,6 @@ class Model:
                     table=table.id,
                     format_config=dimension.format,
                     type=dimension.type,
-                    currency=model.currency,
                     **dimension.dict(include=table_calc_fields | {"union"}),
                 )
 
@@ -97,18 +99,10 @@ class Model:
                 obj.add_measure(
                     table=table.id,
                     id=id_,
-                    format_config=measure.format,
                     type=measure.type,
-                    currency=model.currency,
-                    **measure.dict(
-                        include=table_calc_fields | {"str_filter", "str_time"}
-                    ),
+                    str_expr=measure.str_expr,
+                    str_filter=measure.str_filter,
                 )
-
-        # add detached dimensions
-        # for dimension in model.dimensions.values():
-        #     table = obj.tables[dimension.table]
-        #     obj.add_dimension(dimension, table)
 
         # add metrics
         for id_, metric in model.metrics.items():
@@ -116,10 +110,13 @@ class Model:
                 id=id_,
                 type=metric.type,
                 format_config=metric.format,
-                currency=model.currency,
-                **metric.dict(
-                    include=table_calc_fields | {"str_filter", "str_time", "table"}
-                ),
+                str_expr=metric.str_expr,
+                str_filter=metric.str_filter,
+                str_time=metric.str_time,
+                name=metric.name,
+                description=metric.description,
+                missing=metric.missing,
+                table=metric.table,
             )
 
         # add measure backlinks
@@ -132,7 +129,8 @@ class Model:
         for id_, time_dimension in time_dimensions.items():
             obj.dimensions[id_] = time_dimension(locale=obj.locale)
 
-        check_model(obj)
+        # TODO: turn on
+        # check_model(obj)
         return obj
 
     def add_table(
@@ -149,22 +147,27 @@ class Model:
         self.tables[result.id] = result
         if filters:
             result.filters = [TableFilter(str_expr=f, table=result) for f in filters]
+        if primary_key is not None:
+            # add a dimension for internal use
+            self.add_dimension(
+                table=result.id,
+                id=f"__PK_{id}",
+                name=f"__PK_{id}",
+                str_expr=primary_key,
+                type="int",
+            )
         return result
 
     def add_measure(
         self,
         table: str,
         id: str,
-        name: str,
         str_expr: str,
-        currency: str,
         description: Optional[str] = None,
         type: Optional[str] = None,
         missing: Optional[Any] = None,
-        format_config: Optional[schema.FormatConfig] = None,
         str_filter: Optional[str] = None,
         str_time: Optional[str] = None,
-        metric: Optional[bool] = True,
     ) -> Measure:
         if type is None:
             type = "float"
@@ -174,23 +177,13 @@ class Model:
             model=self,
             table=table,
             id=id,
-            name=name,
-            description=description,
             type=type,
             missing=missing,
             str_expr=str_expr,
             str_filter=str_filter,
             str_time=str_time,
-            format=Format(
-                type=type,
-                config=format_config,
-                locale=self.locale,
-                default_currency=currency,
-            ),
+            description=description,
         )
-        if metric:
-            metric_ = Metric.from_measure(result, self)
-            self.metrics[metric_.id] = metric_
         table.measures[result.id] = result
         self.measures[result.id] = result
         return result
@@ -202,13 +195,12 @@ class Model:
         name: str,
         str_expr: str,
         type: str,
-        currency: str,
         description: Optional[str] = None,
         missing: Optional[Any] = None,
         format_config: Optional[schema.FormatConfig] = None,
         union: Optional[str] = None,
     ) -> Dimension:
-        table = self.tables.get(table)
+        table = self.tables[table]
         type = resolve_type(type)
         result = Dimension(
             table=table,
@@ -222,7 +214,7 @@ class Model:
                 type=type,
                 config=format_config,
                 locale=self.locale,
-                default_currency=currency,
+                default_currency=self.currency,
             ),
         )
         table.dimensions[result.id] = result
@@ -250,7 +242,6 @@ class Model:
         id: str,
         name: str,
         str_expr: str,
-        currency: str,
         description: Optional[str] = None,
         missing: Optional[Any] = None,
         type: Optional[str] = None,
@@ -260,21 +251,18 @@ class Model:
         table: Optional[str] = None,
     ):
         if table is not None:
-            # table is specified, treat as that table's measure
-            return self.add_measure(
+            # table is specified, add the measure first
+            measure = self.add_measure(
                 table=table,
                 id=id,
-                name=name,
                 str_expr=str_expr,
                 description=description,
                 missing=missing,
                 type=type,
-                format_config=format_config,
                 str_time=str_time,
                 str_filter=str_filter,
-                currency=currency,
-                metric=True,
             )
+            str_expr = f"${measure.id}"
 
         # no, it's a real metric
         if type is None:
@@ -292,7 +280,7 @@ class Model:
                 locale=self.locale,
                 type=type,
                 config=format_config,
-                default_currency=currency,
+                default_currency=self.currency,
             ),
         )
         self.metrics[result.id] = result

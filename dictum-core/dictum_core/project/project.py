@@ -326,6 +326,10 @@ class Project:
                 self.update_shorthand_metric(
                     _get_subtree_str(definition, item), table, commit=False
                 )
+            elif item.data == "measure":
+                self.update_shorthand_measure(
+                    _get_subtree_str(definition, item), table, commit=False
+                )
             elif item.data == "table_format":
                 self.update_shorthand_format(
                     _get_subtree_str(definition, item.children[0])
@@ -373,8 +377,23 @@ class Project:
     ):
         tree = parse_shorthand_metric(definition)
         id_, kwargs = _get_calculation_kwargs(definition, tree)
-        kwargs["table"] = kwargs.get("table", table)
+        table = kwargs.get("table", table)
+        if table is not None:
+            kwargs["table"] = table
         update = {"metrics": {id_: kwargs}}
+        self.stage_model_data(update)
+        if commit:
+            self.commit_model_data()
+
+    def update_shorthand_measure(
+        self, definition: str, table: Optional[str] = None, commit: bool = True
+    ):
+        tree = parse_shorthand_metric(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        table = kwargs.get("table", table)
+        if table is None:
+            raise ValueError("Measure requires a table")
+        update = {"tables": {table: {"measures": {id_: kwargs}}}}
         self.stage_model_data(update)
         if commit:
             self.commit_model_data()

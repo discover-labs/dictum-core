@@ -25,6 +25,12 @@ class Preprocessor(Transformer):
     def IDENTIFIER(self, token: Token):
         return token.value
 
+    def INTEGER(self, token: Token):
+        return int(token.value)
+
+    def FLOAT(self, token: Token):
+        return float(token.value)
+
     def identifier(self, children: list):
         return children[0]
 
@@ -39,15 +45,6 @@ class Preprocessor(Transformer):
 
     def ql__QUOTED_IDENTIFIER(self, token: Token):
         return token.value.strip('"')
-
-    def table_metric(self, children: list):
-        return children[0]
-
-    def table_dimension(self, children: list):
-        return children[0]
-
-    def table_related(self, children: list):
-        return children[0]
 
     def filter(self, children: list):
         """Inline expr node directly into filter"""

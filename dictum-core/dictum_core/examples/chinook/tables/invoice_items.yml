@@ -10,8 +10,9 @@ related:
 
 measures:
   test_arppu:
-    name: ARPPU as a measure for testing
-    description: Used for checking that measure references resolve correctly
+    description: |
+      ARPPU as a measure for testing. Used for checking that measure
+      references resolve correctly.
     expr: $revenue / countd(invoice.CustomerId)
 
 dimensions:

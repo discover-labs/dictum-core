@@ -9,7 +9,7 @@ from babel.numbers import format_currency, format_decimal, format_percent
 
 from dictum_core.format import d3
 from dictum_core.model.types import Type
-from dictum_core.schema.model.format import Format, FormatConfig
+from dictum_core.schema.model.calculations import Format, FormatConfig
 
 grain_skeletons = {
     "year": "y",

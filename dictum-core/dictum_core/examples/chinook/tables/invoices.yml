@@ -8,11 +8,9 @@ related:
 
 measures:
   min_sale_date:
-    metric: false
-    name: First Sale Date
-    description: Not a metric, used in customers dimension.
-    type: date
     expr: min(InvoiceDate)
+    type: date
+    description: Not a metric, used in customers dimension.
 
 dimensions:
   invoice_date:

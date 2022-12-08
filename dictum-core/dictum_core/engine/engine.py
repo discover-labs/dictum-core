@@ -84,7 +84,8 @@ class Engine:
         return compose_left(*adders)(merge)
 
     def get_computation(self, query: Query) -> MergeOperator:
-        check_query(self.model, query)
+        # TODO: turn on
+        # check_query(self.model, query)
         terminal = self.get_terminal(query)
         return FinalizeOperator(
             input=MaterializeOperator([terminal]),

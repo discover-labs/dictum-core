@@ -12,10 +12,10 @@ from dictum_core.schema.model import Model
 from dictum_core.schema.model.calculations import (
     Dimension,
     DimensionsUnion,
+    FormatConfig,
     Measure,
     Metric,
 )
-from dictum_core.schema.model.format import FormatConfig
 from dictum_core.schema.model.table import Table
 from dictum_core.schema.project import Project
 

@@ -5,6 +5,10 @@ class DictumError(Exception):
     """Root exception class"""
 
 
+class ShoudntHappenError(DictumError):
+    """Errors that shouldn't happen. Mean there's a bug in the engine itself"""
+
+
 class LoadingError(DictumError):
     """Problems occurring when project YAML files are being loaded"""
 

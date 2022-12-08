@@ -81,6 +81,12 @@ class ProjectMagics(Magics):
             cell = ""
         self.project.update_shorthand_metric(f"{line} {cell}")
 
+    @line_cell_magic
+    def measure(self, line: str, cell=None):
+        if cell is None:
+            cell = ""
+        self.project.update_shorthand_measure(f"{line} {cell}")
+
     @line_magic
     def union(self, line: str):
         self.project.update_shorthand_union(line)

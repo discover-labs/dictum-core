@@ -25,7 +25,7 @@ class Column:
 
     name: str
     expr: Tree
-    type: Type
+    type: Optional[Type] = None
     display_info: Optional[DisplayInfo] = None
 
     @property
@@ -57,10 +57,15 @@ class Relation:
 
         alias, *path = path
 
-        # the join path requests a subquery metric join
+        # the join path requests a subquery measure join
         # in case of an aggregate dimension
         # inject the necessary subquery and terminate
         if alias.startswith("__subquery__"):
+
+            # don't add the same measure subquery twice
+            if alias in set(j.alias for j in self.join_tree):
+                return
+
             measure_id = alias.replace("__subquery__", "")
             table = self.source.measure_backlinks.get(measure_id)
 

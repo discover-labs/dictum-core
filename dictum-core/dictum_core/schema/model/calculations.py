@@ -1,36 +1,65 @@
-from typing import Any, Optional
+from typing import Any, Literal, Optional, Union
 
-from pydantic import Field
+from pydantic import BaseModel, Field, root_validator
 
-from dictum_core.schema.model.format import Formatted
+FormatKind = Literal[
+    "number", "decimal", "percent", "currency", "date", "datetime", "string"
+]
+
+
+class FormatConfig(BaseModel):
+    kind: FormatKind
+    pattern: Optional[str]
+    skeleton: Optional[str]
+    currency: Optional[str]
+
+    @root_validator(skip_on_failure=True)
+    def validate_pattern_skeleton(cls, values):
+        pat = values.get("pattern")
+        skel = values.get("skeleton")
+        if pat is not None and skel is not None:
+            raise ValueError("pattern and skeleton options are mutually exclusive")
+        if skel is not None and values["kind"] not in {"date", "datetime"}:
+            raise ValueError(
+                "skeletons can only be used with date and datetime formats"
+            )
+        return values
+
+
+Format = Union[FormatKind, FormatConfig]
+
+
+class Formatted(BaseModel):
+
+    format: Optional[Format]
 
 
 class Displayed(Formatted):
     name: str
     description: Optional[str]
+
+
+class Calculation(BaseModel):
     type: str
-    missing: Optional[Any]
-
-
-class Calculation(Displayed):
     str_expr: str = Field(..., alias="expr")
+    missing: Optional[Any] = None
 
 
-class AggregateCalculation(Calculation):
+class Aggregation(Calculation):
     type: str = "float"
     str_filter: Optional[str] = Field(alias="filter")
     str_time: Optional[str] = Field(alias="time")
 
 
-class Measure(AggregateCalculation):
-    metric: bool = False
+class Measure(Aggregation):
+    description: Optional[str]
 
 
-class Metric(AggregateCalculation):
+class Metric(Displayed, Aggregation):
     table: Optional[str]  # this one is for metric-measures
 
 
-class Dimension(Calculation):
+class Dimension(Displayed, Calculation):
     union: Optional[str]
 
 
@@ -43,4 +72,5 @@ class DetachedDimension(Dimension):
 
 
 class DimensionsUnion(Displayed):
-    pass
+    type: str
+    missing: Optional[Any]

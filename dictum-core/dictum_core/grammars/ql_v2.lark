@@ -1,0 +1,6 @@
+query: explain | select
+
+explain: "EXPLAIN"i select
+
+select: _select_statement*
+_select_statement: select | by | filter | with

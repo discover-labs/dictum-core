@@ -339,6 +339,8 @@ class DatetruncTransform(ScalarTransform):
         self, display_info: Optional["engine.DisplayInfo"]
     ) -> "engine.DisplayInfo":
         info = super().get_display_info(display_info)
+        if info is None:
+            return None
         info.altair_time_unit = self.part_to_altair_time_unit.get(self._args[0])
         return info
 

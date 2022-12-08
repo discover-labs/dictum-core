@@ -37,8 +37,8 @@ def model() -> Model:
                     "source": "t1",
                     "primary_key": "pk",
                     "measures": {
-                        "me1": {"name": "me1", "expr": "sum(col)"},
-                        "me3": {"name": "me3", "expr": "sum(col)"},
+                        "me1": {"expr": "sum(col)"},
+                        "me3": {"expr": "sum(col)"},
                     },
                     "dimensions": {
                         "d1": {"name": "d1", "expr": "col", "type": "int"},
