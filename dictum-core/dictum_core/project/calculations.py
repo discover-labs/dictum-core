@@ -5,7 +5,7 @@ import altair as alt
 
 import dictum_core.model
 import dictum_core.project
-from dictum_core.engine.metrics import transforms as table_transforms
+from dictum_core.engine.graph.builders import MetricsGraphBuilder
 from dictum_core.engine.query import (
     QueryDimension,
     QueryDimensionRequest,
@@ -19,7 +19,7 @@ from dictum_core.project.altair.encoding import AltairEncodingChannelHook
 from dictum_core.project.templates import environment, lineage_spec
 
 scalar_transforms = set(scalar_transforms)
-table_transforms = set(table_transforms)
+table_transforms = set(MetricsGraphBuilder.transforms)
 
 
 class ProjectCalculation(AltairEncodingChannelHook):

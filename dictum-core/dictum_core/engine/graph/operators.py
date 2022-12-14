@@ -1,13 +1,18 @@
+from datetime import date, datetime
 from hashlib import md5
 from typing import Any, Dict, List, Optional, Union
 
-from lark import Tree
-from pandas import DataFrame
+import dateutil
+from lark import Token, Tree
+from pandas import DataFrame, concat, isna, merge
 
 from dictum_core import model
+from dictum_core.backends.base import Backend
+from dictum_core.backends.pandas import PandasCompiler
 from dictum_core.engine.computation import Column
-from dictum_core.engine.graph.backend.backend import Backend as Backend
 from dictum_core.engine.query import QueryDimension
+from dictum_core.engine.result import DisplayInfo, Result
+from dictum_core.exceptions import ShoudntHappenError
 from dictum_core.utils.expr import value_to_token
 
 
@@ -35,6 +40,15 @@ class Operator:
 
     def execute(self, backend: Backend):
         raise NotImplementedError
+
+    def _materialize(self, backend: Backend, args) -> List[DataFrame]:
+        result = []
+        for arg in args:
+            if isinstance(arg, DataFrame):
+                result.append(arg)
+            else:
+                result.append(backend.execute(arg))
+        return result
 
     def get_result(self, backend: Backend):
         if not self._executed:
@@ -72,9 +86,15 @@ class Operator:
             graph = graphviz.Digraph(
                 format=format,
                 strict=True,
-                node_attr={"fontname": "Monospace", "shape": "box"},
+                node_attr={
+                    "fontname": "Monospace",
+                    "shape": "box",
+                    "fontsize": "9",
+                    "height": "0",
+                    "width": "0",
+                },
+                graph_attr={"rankdir": "BT"},
             )
-            graph.graph_attr["rankdir"] = "LR"
             graph.node(self_id, label=f"{self.label}\n[{self.digest[:6]}]")
 
         for dependency in self._upstreams:
@@ -93,6 +113,9 @@ class Operator:
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.digest})"
+
+    def _repr_mimebundle_(self, *args, **kwargs):
+        return self.graph()._repr_mimebundle_(*args, **kwargs)
 
 
 class TableOperator(Operator):
@@ -118,7 +141,7 @@ class LeftJoinOperator(Operator):
 
     def __init__(
         self,
-        left: TableOperator,
+        left: Union[TableOperator, "MergeOperator"],
         left_identity: str,
         right: List[Union[TableOperator, "AggregateOperator"]],
         join_exprs: List[Tree],
@@ -134,11 +157,11 @@ class LeftJoinOperator(Operator):
     @property
     def label(self) -> str:
         idx = "\n".join(self.right_identities)
-        return f"{self.left.table.id} LEFT JOIN\n{idx}"
+        return f"{self.left_identity} LEFT JOIN\n{idx}"
 
     def get_parameters_digest(self) -> str:
         right_idx = ":".join(self.right_identities)
-        exprs = ":".join(str(hash(e)) for e in self.join_exprs)
+        exprs = ":".join(_digest(str(e)) for e in self.join_exprs)
         return _digest(f"{self.left_identity}:{right_idx}:{exprs}")
 
     def execute(self, backend: Backend):
@@ -215,8 +238,7 @@ class RecordsFilterOperator(Operator):
 
     @property
     def label(self) -> str:
-        fields = ", ".join(set(x for y in self.field_exprs for x in y))
-        return f"RECORDS FILTER\non {fields}"
+        return f"FILTER WITH RECORDS\non {len(self.field_exprs)} dimensions"
 
     def get_parameters_digest(self) -> str:
         return ""
@@ -236,13 +258,15 @@ class RecordsFilterOperator(Operator):
 
     def get_records_filter_expr(
         self, records: List[dict], exprs: Dict[str, Tree]
-    ) -> Tree:
+    ) -> Optional[Tree]:
         tree = None
         for record in records:
             if tree is None:
                 tree = self.get_record_filter_expr(record, exprs)
                 continue
             tree = Tree("OR", [tree, self.get_record_filter_expr(record, exprs)])
+        if tree is None:
+            return Tree("expr", [Token("TRUE", "True")])
         return tree
 
     def execute(self, backend: Backend):
@@ -282,7 +306,7 @@ class GenerateRecordsOperator(Operator):
         result = backend.filter(base, condition=condition, subquery=True)
 
         if not isinstance(result, DataFrame):
-            result = backend.execute(base)
+            result = backend.execute(result)
 
         return result.iloc[:, :-1].to_dict(orient="records")
 
@@ -308,8 +332,7 @@ class AggregateOperator(Operator):
     @property
     def label(self) -> str:
         measures = ", ".join(c.name for c in self.aggregate)
-        dimensions = ", ".join(c.name for c in self.groupby)
-        return f"AGGREGATE {measures}\nBY {dimensions}"
+        return f"AGGREGATE {measures}\nBY {len(self.groupby)} dimensions"
 
     def get_parameters_digest(self) -> str:
         columns = (*self.groupby, *self.aggregate)
@@ -321,14 +344,17 @@ class MergeOperator(Operator):
         self,
         inputs: Optional[List[Union[AggregateOperator, "MergeOperator"]]] = None,
         merge_on: Optional[List[str]] = None,
+        left: bool = False,
     ):
         self.inputs = inputs or []
         self.merge_on = merge_on or []
+        self.left = left
         super().__init__()
 
     @property
     def label(self) -> str:
-        return f"MERGE on {len(self.merge_on)} columns"
+        kind = "LEFT " if self.left else "FULL "
+        return f"{kind}MERGE on {len(self.merge_on)} columns"
 
     def get_parameters_digest(self) -> str:
         return _digest(":".join(self.merge_on))
@@ -366,7 +392,44 @@ class MergeOperator(Operator):
         results = []
         for input in self.inputs:
             results.append(input.get_result(backend))
-        return backend.full_outer_join(results, on=self.merge_on)
+        if len(results) == 1:
+            return results[0]
+        return backend.merge(results, on=self.merge_on, left=self.left)
+
+
+class MaterializedLeftMergeOperator(Operator):
+    def __init__(self, left: Operator, right: List[Operator], on: List[str]):
+        self.left = left
+        self.right = right
+        self.on = on
+        super().__init__()
+
+    def get_parameters_digest(self) -> str:
+        return _digest(":".join(self.on))
+
+    def execute(self, backend: Backend) -> DataFrame:
+        left, *right = self._materialize(
+            backend,
+            [
+                self.left.get_result(backend),
+                *(r.get_result(backend) for r in self.right),
+            ],
+        )
+        result = left
+        for df in right:
+            on_columns = list(set(self.on) & set(result.columns) & set(df.columns))
+            if len(on_columns) > 0:
+                result = merge(
+                    result,
+                    df,
+                    left_on=on_columns,
+                    right_on=on_columns,
+                    how="left",
+                    suffixes=("", "__joined"),  # avoid name clashes
+                )
+            else:
+                result = merge(result, df, how="cross", suffixes=("", "__joined"))
+        return result
 
 
 class CalculateOperator(Operator):
@@ -375,11 +438,116 @@ class CalculateOperator(Operator):
         self.columns = columns
         super().__init__()
 
+    @property
+    def label(self) -> str:
+        return f"CALCULATE\n{len(self.columns)} columns"
+
     def get_parameters_digest(self) -> str:
         columns = ":".join(sorted(c.name for c in self.columns))
-        exprs = ":".join(sorted(str(hash(c.expr)) for c in self.columns))
-        return _digest(f"{columns}:{exprs}")
+        return _digest(f"{columns}")
+
+    def calculate_pandas(self, df: DataFrame) -> DataFrame:
+        compiler = PandasCompiler()
+        tables = {None: df}
+        result = []
+        for column in self.columns:
+            series = compiler.compile(column.expr, tables).rename(column.name)
+            result.append(series)
+        return concat(result, axis=1)
 
     def execute(self, backend: Backend):
         base = self.input.get_result(backend)
+        if isinstance(base, DataFrame):
+            return self.calculate_pandas(base)
         return backend.calculate(base, columns=self.columns)
+
+
+def _date_mapper(v):
+    if isinstance(v, date):
+        return v
+    if isinstance(v, str):
+        return dateutil.parser.parse(v).date()
+    if isinstance(v, datetime):
+        return v.date()
+    return v
+
+
+def _datetime_mapper(v):
+    if isinstance(v, datetime):
+        return v
+    if isinstance(v, date):
+        return datetime.combine(v, datetime.min.time())
+    if isinstance(v, str):
+        return dateutil.parser.parse(v)
+    return v
+
+
+_type_mappers = {
+    "bool": bool,
+    "float": float,
+    "int": int,
+    "str": str,
+    "date": _date_mapper,
+    "datetime": _datetime_mapper,
+}
+
+
+class FinalizeOperator(Operator):
+    """Materialize, convert DataFrame to List[dict], coerce types, add display info"""
+
+    def __init__(self, input: Operator, display_info: Dict[str, DisplayInfo]):
+        self.input = input
+        self.display_info = display_info
+        super().__init__()
+
+    @property
+    def names(self) -> List[str]:
+        return {k: v.column_name for k, v in self.display_info.items()}
+
+    def get_parameters_digest(self) -> str:
+        return ""
+
+    def coerce_types(self, data: List[dict]):
+        types = {k: v.type for k, v in self.display_info.items()}
+        for row in data:
+            for k, v in row.items():
+                if row[k] is None:
+                    continue
+                if isna(row[k]):
+                    row[k] = None
+                else:
+                    row[k] = _type_mappers[types[k].name](v)
+        return data
+
+    def rename_fields(self, data: List[dict]):
+        result = []
+        for row in data:
+            result.append({self.names[k]: v for k, v in row.items()})
+        return result
+
+    def execute(self, backend: Backend) -> Result:
+        result = self.input.get_result(backend)
+
+        # materialize if not materialized
+        if not isinstance(result, DataFrame):
+            result = backend.execute(result)
+
+        result = result.to_dict(orient="records")
+        result = self.coerce_types(result)
+        result = self.rename_fields(result)
+        return Result(
+            data=result,
+            display_info={self.names[k]: v for k, v in self.display_info.items()},
+            executed_queries=[],  # TODO: add
+        )
+
+
+class LimitOperator(Operator):
+    def __init__(self, input: Operator, limit: int):
+        self.input = input
+        self.limit = limit
+        super().__init__()
+
+    def execute(self, backend: Backend):
+        result = self.input.get_result(backend)
+        return backend.limit(result, self.limit)

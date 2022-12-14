@@ -21,10 +21,8 @@ def value_to_token(value):
         return Token("FLOAT", str(value))
     if isinstance(value, str):
         return Token("STRING", value)
-    if isinstance(value, date):
-        return Token("DATE", value.strftime(r"%Y-%m-%d"))
     if isinstance(value, datetime):
-        return Token("DATETIME", value.strftime(r"%Y-%m-%d %H:%M:%S"))
+        return Token("DATETIME", value.isoformat())
     raise ValueError("Token values must by integers, floats or strings")
 
 

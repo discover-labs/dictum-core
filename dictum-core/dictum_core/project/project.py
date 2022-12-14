@@ -9,6 +9,7 @@ from lark import Tree
 from dictum_core import examples, schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
+from dictum_core.engine.graph.operators import Operator
 from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
@@ -151,13 +152,15 @@ class Project:
             model_data=model_data, backend=backend, project_config=project_config
         )
 
+    def get_computation(self, query: Query):
+        return self.engine.get_computation(query)
+
     def execute(self, query: Query) -> Result:
-        computation = self.engine.get_computation(query)
+        computation = self.get_computation(query)
         return computation.execute(self.backend)
 
-    def query_graph(self, query: Query):
-        computation = self.engine.get_computation(query)
-        return computation.graph(self.backend)
+    def query_graph(self, query: Query) -> Operator:
+        return self.engine.get_computation(query)
 
     def ql(self, query: str) -> analyses.QlQuery:
         return analyses.QlQuery(self, query)

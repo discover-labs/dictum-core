@@ -5,7 +5,7 @@ from pandas import DataFrame
 from pandas.api.types import is_datetime64_any_dtype
 
 from dictum_core.backends.base import Backend
-from dictum_core.engine import Column, Engine, RelationalQuery
+from dictum_core.engine import Column, Engine
 from dictum_core.model import Model
 from dictum_core.model.expr.parser import parse_expr
 from dictum_core.schema import Query

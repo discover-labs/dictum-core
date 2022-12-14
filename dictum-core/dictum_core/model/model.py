@@ -42,7 +42,7 @@ class Model:
         from dictum_core.model.checks import check_model
         from dictum_core.schema.model.checks import check_model_config
 
-        # TODO: turn on
+        # FIXME: turn on
         # check_model_config(model)
 
         obj = cls(name=model.name)
@@ -129,7 +129,7 @@ class Model:
         for id_, time_dimension in time_dimensions.items():
             obj.dimensions[id_] = time_dimension(locale=obj.locale)
 
-        # TODO: turn on
+        # FIXME: turn on
         # check_model(obj)
         return obj
 
@@ -220,7 +220,7 @@ class Model:
         table.dimensions[result.id] = result
         if union is not None:
             if union in table.dimensions:
-                raise KeyError(  # TODO: move to checks
+                raise KeyError(  # FIXME: move to checks
                     f"Duplicate union dimension {union} " f"on table {table.id}"
                 )
             union: DimensionsUnion = self.dimensions.get(union)

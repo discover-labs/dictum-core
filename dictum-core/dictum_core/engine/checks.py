@@ -1,6 +1,6 @@
 from itertools import chain
 
-from dictum_core.engine.metrics import transforms as table_transforms
+from dictum_core.engine.graph.builders import MetricsGraphBuilder
 from dictum_core.engine.query import Query
 from dictum_core.exceptions import (
     DuplicateColumnError,
@@ -14,6 +14,8 @@ from dictum_core.exceptions import (
 )
 from dictum_core.model import Model
 from dictum_core.ordered_check_caller import OrderedCheckCaller
+
+table_transforms = set(MetricsGraphBuilder.transforms)
 
 check_query = OrderedCheckCaller()
 
@@ -118,6 +120,8 @@ def _check_dimension_join_paths(model: Model, query: Query):
     _check_dimension_join_paths,
 )
 def _check_of_within_in_dimensions(model: Model, query: Query):
+    # FIXME: with the new engine, the check is only needed with for queried metrics,
+    # not filters
     dimension_digests = set()
     for request in query.dimensions:
         dimension_digests.add(request.dimension.digest)

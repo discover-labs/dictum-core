@@ -3,16 +3,14 @@ from typing import List, Union
 from pandas import DataFrame
 
 from dictum_core import engine, project
+from dictum_core.engine.graph.operators import Operator
 from dictum_core.project.calculations import ProjectDimensionRequest
 from dictum_core.project.formatting import Formatter
-from dictum_core.ql import (
-    compile_dimension,
-    compile_dimension_request,
-    compile_metric,
-    compile_metric_request,
-    compile_query,
-)
+from dictum_core.ql.v2 import compile_dimension, compile_metric, compile_query
 from dictum_core.schema import Query
+
+compile_dimension_request = compile_dimension
+compile_metric_request = compile_metric
 
 
 class Analysis:
@@ -22,6 +20,9 @@ class Analysis:
 
     def _execute(self) -> engine.Result:
         return self.project.execute(self.query)
+
+    def _execution_graph(self):
+        return self.project.get_computation(self.query)
 
     def _get_df(self, result: "engine.Result") -> DataFrame:
         return DataFrame(result.data)
@@ -46,7 +47,7 @@ class Analysis:
         df.columns = [result.display_info[c].display_name for c in df.columns]
         return df
 
-    def graph(self):
+    def graph(self) -> Operator:
         return self.project.query_graph(self.query)
 
     @property

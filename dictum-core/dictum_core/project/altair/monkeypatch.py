@@ -35,8 +35,8 @@ from altair.vegalite.v4.api import _EncodingMixin
 from jsonschema.exceptions import ValidationError
 from toolz.curried import curry
 
-from dictum_core.engine.computation import DisplayInfo
 from dictum_core.engine.query import Query, QueryMetricRequest
+from dictum_core.engine.result import DisplayInfo
 from dictum_core.project.altair.data import DictumData
 from dictum_core.project.altair.encoding import AltairEncodingChannelHook, filter_fields
 from dictum_core.project.altair.locale import (

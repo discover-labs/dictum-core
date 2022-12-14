@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
 from functools import cached_property, wraps
-from typing import Any, Dict, List, Optional
+from typing import List, Optional, Union
 
 import pkg_resources
 from lark import Token, Transformer, Tree
 from pandas import DataFrame
 
-from dictum_core.engine import Column, OrderItem, RelationalQuery
+from dictum_core.engine import Column
 
 
 @dataclass
@@ -61,6 +61,7 @@ class ExpressionTransformer(Transformer):
     FLOAT = PassTokenValueToCompiler()
     INTEGER = PassTokenValueToCompiler()
     STRING = PassTokenValueToCompiler()
+    DATETIME = PassTokenValueToCompiler()
 
     def TRUE(self, _):
         return self.compiler.TRUE()
@@ -144,6 +145,10 @@ class Compiler(ABC):
     @abstractmethod
     def FALSE(self):
         """False boolean literal"""
+
+    @abstractmethod
+    def DATETIME(self, value: str):
+        """Convert to datetime"""
 
     @abstractmethod
     def isnull(self, value):
@@ -365,44 +370,8 @@ class Compiler(ABC):
     # compilation
 
     @abstractmethod
-    def compile_query(self, query: RelationalQuery):
-        """Compile a single relational query into connection query."""
-
-    @abstractmethod
-    def merge_queries(self, queries: List, merge_on: List[str]):
-        """Merge a list of relational queries on the relevant level of detail. Can be
-        unsupported by a backend, raise NotImplementedError in this case.
-        """
-
-    @abstractmethod
-    def calculate(
-        self, query, columns: List[Column], filters: Optional[List[Tree]] = None
-    ):
-        """Calculate expressions from the fields of a query"""
-
-    @abstractmethod
-    def filter(self, query, conditions: List[Tree]):
-        """Filter a query on a list of conditions"""
-
-    @abstractmethod
-    def filter_with_records(self, query, records: List[List[Dict[str, Any]]]):
-        """Use a list of dicts as a filter for a query. Each dict is a
-        combination of valid field values, the rest are filtered out.
-        """
-
-    @abstractmethod
-    def inner_join(self, query, to_join, join_on: List[str]):
-        """Use another query as an inner join for a query, join condition is equality
-        on a list of columns (same names in both queries).
-        """
-
-    @abstractmethod
-    def limit(self, query, limit: int):
-        """Limit a query (mostly user with order)."""
-
-    @abstractmethod
-    def order(self, query, items: List[OrderItem]):
-        """Add ordering to a query."""
+    def compile(self, expr: Tree, tables: dict):
+        """Compile a single expression"""
 
 
 class BackendRegistry(UserDict):
@@ -456,7 +425,7 @@ class Backend(ABC):
     registry: BackendRegistry = BackendRegistry()
 
     def __init__(self, **kwargs):
-        self.compiler = self.compiler_cls(self)
+        self.compiler = self.compiler_cls()
         self.parameters = kwargs
 
     def __init_subclass__(cls):
@@ -478,32 +447,49 @@ class Backend(ABC):
     def display_query(self, query):
         return str(query)
 
-    def compile_query(self, query):
-        return self.compiler.compile_query(query)
+    def compile(self, expr: Tree, tables: dict):
+        return self.compiler.compile(expr, tables)
 
-    def merge_queries(self, queries: List, merge_on: List[str]):
-        return self.compiler.merge_queries(queries, merge_on)
+    # methods that operators use
+    @abstractmethod
+    def table(self, source: Union[str, dict], identity: str):
+        """Given a source, return a backend-specific table object.
+        Tables require an identity to disabmbiguate between columns
+        of different tables.
+        """
 
-    def calculate(
-        self, query, columns: List[Column], filters: Optional[List[Tree]] = None
+    @abstractmethod
+    def left_join(
+        self, left, right, left_identity: str, right_identity: str, join_expr: Tree
     ):
-        return self.compiler.calculate(query, columns, filters=filters)
+        """
+        Perform a left join between left and right tables, using the given expression
+        and setting corresponding table identities.
+        """
 
-    def filter(self, query, conditions: List[Tree]):
-        return self.compiler.filter(query, conditions)
+    @abstractmethod
+    def aggregate(self, base, groupby: List[Column], aggregate: List[Column]):
+        """Perform an aggregation on an input backend-specific table-like object"""
 
-    def filter_with_records(self, query, records: List[List[Dict[str, Any]]]):
-        return self.compiler.filter_with_records(query, records)
+    @abstractmethod
+    def filter(self, base, condition: Tree):
+        """Filter a table-like backend-specific object based on condition"""
 
-    def inner_join(self, query, to_join, join_on: List[str]):
-        return self.compiler.inner_join(query, to_join, join_on)
+    @abstractmethod
+    def calculate(self, base, columns: List[Column]):
+        """Perform calculations on columns of an input table-like object"""
 
-    def limit(self, query, limit: int):
-        return self.compiler.limit(query, limit)
-
-    def order(self, query, items: List[OrderItem]):
-        return self.compiler.order(query, items)
+    @abstractmethod
+    def merge(self, bases: list, on=List[str], left: bool = False):
+        """Perform a full outer join of a list of table-like objects
+        using a list of named columns. Some or all columns might be absent
+        from some tables. "on" columns are merged into one with COALESCE.
+        """
 
     @abstractmethod
     def execute(self, query) -> DataFrame:
         """Execute query, return results"""
+
+    @abstractmethod
+    def limit(self, base, limit: int):
+        """Limit number of results of the base query"""

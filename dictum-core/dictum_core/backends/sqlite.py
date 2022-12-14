@@ -1,14 +1,17 @@
 import warnings
 from functools import cached_property
-from typing import List
+from typing import List, Union
 
+from lark import Tree
 from pandas import DataFrame
-from sqlalchemy import Integer, String, create_engine
+from sqlalchemy import Integer, String, and_, case, cast, create_engine, func, select
 from sqlalchemy.exc import SAWarning
-from sqlalchemy.sql import Select, case, cast, func
+from sqlalchemy.sql import Select
 
 from dictum_core.backends.mixins.datediff import DatediffCompilerMixin
+from dictum_core.backends.pandas import PandasBackendFallbackMixin
 from dictum_core.backends.sql_alchemy import SQLAlchemyBackend, SQLAlchemyCompiler
+from dictum_core.engine import Column
 
 trunc_modifiers = {
     "year": ["start of year"],
@@ -34,7 +37,8 @@ part_formats = {
 }
 
 
-class SQLiteFunctionsMixin:
+class SQLiteCompiler(DatediffCompilerMixin, SQLAlchemyCompiler):
+    # there's not floor and ceil in SQLite
     def floor(self, arg):
         return case(
             (arg < 0, cast(arg, Integer) - 1),
@@ -51,12 +55,15 @@ class SQLiteFunctionsMixin:
         """Fix integer division semantics"""
         return a / self.tofloat(b)
 
+    # there's not date/datetime type in SQLite, so casting won't work
+    # use built-in conversion functions
     def todate(self, arg):
         return func.date(arg)
 
     def todatetime(self, arg):
         return func.datetime(arg)
 
+    # datetrunc wizardry
     def datetrunc(self, part, arg):
         if part in trunc_modifiers:
             modifiers = trunc_modifiers[part]
@@ -76,6 +83,7 @@ class SQLiteFunctionsMixin:
             f"got '{part}'."
         )
 
+    # datepart wizardry (with string formatting)
     def datepart_quarter(self, arg):
         return cast(
             (func.strftime("%m", arg) + 2) / 3,
@@ -101,6 +109,7 @@ class SQLiteFunctionsMixin:
             f"got '{part}'."
         )
 
+    # for day diff datediff mixin
     def datediff_day(self, start, end):
         start_day = func.julianday(self.datetrunc("day", start))
         end_day = func.julianday(self.datetrunc("day", end))
@@ -130,32 +139,100 @@ class SQLiteFunctionsMixin:
         return func.date()
 
 
-class SQLiteCompiler(SQLiteFunctionsMixin, DatediffCompilerMixin, SQLAlchemyCompiler):
-    pass
-
-
-class SQLiteBackend(SQLAlchemyBackend):
+class SQLiteBackend(SQLAlchemyBackend, PandasBackendFallbackMixin):
 
     type = "sqlite"
     compiler_cls = SQLiteCompiler
 
     def __init__(self, database: str):
-        super().__init__(
-            drivername="sqlite",
-            database=database,
-            pool_size=None,
-            default_schema=None,
-        )
+        super().__init__(drivername="sqlite", database=database)
 
     @cached_property
     def engine(self):
         """SQLite doesn't support connection pooling, so have to redefine this"""
         return create_engine(self.url)
 
+    def _materialize(self, args: List[Union[Select, DataFrame]]) -> List[DataFrame]:
+        result = []
+        for arg in args:
+            if isinstance(arg, DataFrame):
+                result.append(arg)
+            else:
+                result.append(self.execute(arg))
+        return result
+
     def execute(self, query: Select) -> DataFrame:
+        # hide SQLAlchemy warnings about decimals
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", SAWarning)
             return super().execute(query)
 
-    def merge_queries(self, queries: List[Select], merge_on: List[str]):
-        raise NotImplementedError
+    def union_all_full_outer_join(
+        self, left: Select, right: Select, on: List[str], left_join: bool = False
+    ) -> Select:
+        """Perform a full outer join on two tables using UNION ALL of two LEFT JOINs
+        or just a left join. Merge "on" columns with COALESCE.
+        """
+        on_columns = (
+            set(left.selected_columns.keys())
+            & set(right.selected_columns.keys())
+            & set(on)
+        )
+
+        left = left.subquery()
+        right = right.subquery()
+
+        onclause = True
+        if len(on_columns) > 0:
+            onclause = and_(*(left.c[c] == right.c[c] for c in on_columns))
+
+        # on_columns: columns that should be coalesce'd
+        # other columns: left alone in both
+        coalesced_columns = [
+            func.coalesce(left.c[name], right.c[name]).label(name)
+            for name in on_columns
+        ]
+        other_left_columns = [c for c in left.c if c.name not in on_columns]
+        other_right_columns = [c for c in right.c if c.name not in on_columns]
+        other_columns = [*other_left_columns, *other_right_columns]
+
+        first: Select = select(*coalesced_columns, *other_columns).select_from(
+            left.join(right, onclause=onclause, isouter=True)
+        )
+
+        if left_join:
+            return first
+
+        join_check = list(left.c)[-1]  # last column is the metric
+        second = (
+            select(*coalesced_columns, *other_columns)
+            .select_from(right.join(left, onclause=onclause, isouter=True))
+            .where(join_check == None)  # noqa: E711
+        )
+        return first.union_all(second)
+
+    def merge(self, bases: List[Select], on: List[str], left: bool = False):
+        """SQLite doesn't support full outer join, so we have to emulate it with
+        UNION ALL and LEFT JOIN
+        """
+        # materialize bases that aren't materialized yet
+        result, *rest = bases
+        for add in rest:
+            result = self.union_all_full_outer_join(result, add, on, left_join=left)
+        return result.subquery().select()
+
+    # because of the missing full outer join, now other operations can
+    # get DataFrames as input
+    def calculate(
+        self, base: Union[Select, DataFrame], columns: List[Column]
+    ) -> Union[Select, DataFrame]:
+        if isinstance(base, DataFrame):
+            return self.calculate_pandas(base, columns)
+        return super().calculate(base, columns)
+
+    def filter(
+        self, base: Union[Select, DataFrame], condition: Tree, subquery: bool = False
+    ) -> Union[Select, DataFrame]:
+        if isinstance(base, DataFrame):
+            return self.filter_pandas(base, condition)
+        return super().filter(base, condition, subquery)

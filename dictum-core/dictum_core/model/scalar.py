@@ -92,13 +92,8 @@ class ScalarTransform(metaclass=ScalarTransformMeta):
     def transform_expr(self, expr: Tree) -> Tree:
         raise NotImplementedError
 
-    def __call__(self, column: "engine.Column"):
-        return engine.Column(
-            name=self.get_name(column.name),
-            type=self.get_return_type(column.type),
-            expr=Tree("expr", [self.transform_expr(column.expr.children[0])]),
-            display_info=self.get_display_info(column.display_info),
-        )
+    def __call__(self, expr: Tree) -> Tree:
+        return Tree("expr", [self.transform_expr(expr.children[0])])
 
 
 class LiteralTransform(ScalarTransform):

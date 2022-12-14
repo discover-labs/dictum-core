@@ -1,6 +1,116 @@
-query: explain | select
+// Dictum query language v2
 
-explain: "EXPLAIN"i select
+%ignore /\s+/
 
-select: _select_statement*
-_select_statement: select | by | filter | with
+COMMENT: /(--|#).*/  // both Python and SQL-style comments
+%ignore COMMENT
+
+// keywords
+_FROM: "FROM"i
+_FILTER: "FILTER"i
+_WHERE: "WHERE"i
+_DECLARE: "DECLARE"i
+_SELECT: "SELECT"i
+_ORDERBY: /ORDER\s+BY/i
+_LIMIT: "LIMIT"i
+_OF: "OF"i
+_WITHIN: "WITHIN"i
+_IS: "IS"i
+_NULL: "NULL"i
+_NOT: "NOT"i
+_IN: "IN"i
+
+// literals
+%import common._STRING_ESC_INNER
+%import common.INT -> UINT
+%import common.SIGNED_INT -> INT
+%import common.SIGNED_FLOAT -> FLOAT
+%import common.CNAME -> IDENTIFIER
+
+TRUE: "TRUE"i
+FALSE: "FALSE"i
+STRING: "'" _STRING_ESC_INNER "'"
+DATETIME: "@" /\d{4}[\dTZ\.:+-]*/  // dateutil.parser.isoparse compatible string
+
+?literal: TRUE | FALSE | STRING | INT | FLOAT | DATETIME
+
+QUOTED_IDENTIFIER: "\"" _STRING_ESC_INNER "\""
+identifier: IDENTIFIER | QUOTED_IDENTIFIER
+
+// top-leve objects
+stmt: explain | query
+explain: "EXPLAIN"i query
+
+// query
+query: cube select orderby? limit?
+
+// filters + temp metric declarations (select a subset of the hypothetical data cube)
+// we need to parse this part of the query separately in some parts of the code
+cube: source _qualifier*
+_qualifier: filter_group | declare
+
+// filters
+filter_group: _FILTER _filter ( "," _filter )* ","?
+_filter: scalar_filter | table_filter
+scalar_filter: _expr{dimension}
+table_filter: table_filter_of table_filter_where
+table_filter_of: dimension | _dimensions
+table_filter_where: _WHERE _expr{table_filter_metric}
+table_filter_window: within
+table_filter_metric: "$"? _metric table_filter_window?
+
+declare: _DECLARE identifier "=" _expr{metric}
+
+_expr{c}: eq{c} | ne{c} | gt{c} | ge{c} | lt{c} | le{c} | isnull{c} | isnotnull{c}
+    | isin{c} | c
+eq{c}: c "=" literal
+ne{c}: c ( "<>" | "!=" ) literal
+gt{c}: c ">" literal
+ge{c}: c ">=" literal
+lt{c}: c "<" literal
+le{c}: c "<=" literal
+isnull{c}: c _IS _NULL
+isnotnull{c}: c _IS _NOT _NULL
+isin{c}: c _IN _tuple
+_tuple: "(" literal ("," literal)* ")"
+
+
+_metric: identifier [ "." method ]
+method: identifier [ "(" _args? ")" ]
+_args: literal ( "," literal )*
+
+of: _OF _dimensions
+within: _WITHIN _dimensions
+window: of? within?
+
+_dimension: identifier [ "." method ]
+
+// metric and dimension are used in unambiguous contexts, so $ and : are optional
+metric: "$"? _metric window?
+dimension: ":"? _dimension
+
+_dimensions: "(" dimension ( "," dimension )* ")"
+
+alias: identifier "="
+_request{calc}: alias? calc
+
+// requested calculations: $ and : are required in SELECT
+requested_metric: "$" _metric window?
+requested_dimension: ":" _dimension
+
+metric_request: _request{requested_metric}
+dimension_request: _request{requested_dimension}
+
+_select_item: metric_request | dimension_request
+
+select: _SELECT _select_item ( "," _select_item )* ","?
+
+_order_def{c}: SORT_ORDER? c
+metric_orderby_item: _order_def{requested_metric}
+dimension_orderby_item: _order_def{requested_dimension}
+_orderby_item: metric_orderby_item | dimension_orderby_item
+
+SORT_ORDER: "+" | "-"
+orderby: _ORDERBY _orderby_item ( "," _orderby_item )* ","?
+limit: _LIMIT UINT
+source: _FROM identifier ":" ( identifier | STRING )
