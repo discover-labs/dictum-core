@@ -97,9 +97,12 @@ class QueryFilterGroup(Base):
     filters: List[Filter]
 
 
-class QueryMetricDeclaration(Base):
+class QueryMetricDeclaration(QueryMetric):
     alias: str
-    metric: QueryMetric
+
+    @property
+    def name(self) -> str:
+        return self.alias
 
 
 Qualifier = Union[QueryFilterGroup, QueryMetricDeclaration]
@@ -117,23 +120,27 @@ class QueryCube(Base):
 
 class QueryDimensionRequest(QueryDimension):
     kind: Literal["dimension"] = "dimension"
-    alias: str
+    alias: Optional[str] = None
 
     def _get_digest_json(self) -> str:
         return self.json(sort_keys=True, exclude={"kind", "alias"})
 
     @property
     def name(self) -> str:
-        return self.alias
+        if self.alias is not None:
+            return self.alias
+        return super().name
 
 
 class QueryMetricRequest(QueryMetric):
     kind: Literal["metric"] = "metric"
-    alias: str
+    alias: Optional[str] = None
 
     @property
     def name(self) -> str:
-        return self.alias
+        if self.alias is not None:
+            return self.alias
+        return super().name
 
     def _get_digest_json(self) -> str:
         return self.json(sort_keys=True, exclude={"kind", "alias"})

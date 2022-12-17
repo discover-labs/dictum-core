@@ -31,8 +31,9 @@ TRUE: "TRUE"i
 FALSE: "FALSE"i
 STRING: "'" _STRING_ESC_INNER "'"
 DATETIME: "@" /\d{4}[\dTZ\.:+-]*/  // dateutil.parser.isoparse compatible string
+PERCENTAGE: (INT | FLOAT) "%"
 
-?literal: TRUE | FALSE | STRING | INT | FLOAT | DATETIME
+?literal: TRUE | FALSE | STRING | INT | FLOAT | DATETIME | PERCENTAGE
 
 QUOTED_IDENTIFIER: "\"" _STRING_ESC_INNER "\""
 identifier: IDENTIFIER | QUOTED_IDENTIFIER

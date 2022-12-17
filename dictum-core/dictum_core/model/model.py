@@ -37,6 +37,9 @@ class Model:
         self.dimensions: Dict[str, Dimension] = {}
         self.metrics: Dict[str, Metric] = {}
 
+        # used by the engine for storing temporary aliases for metrics
+        self.temp_metrics: Dict[str, Metric] = {}
+
     @classmethod
     def from_config(cls, model: schema.Model):
         from dictum_core.model.checks import check_model

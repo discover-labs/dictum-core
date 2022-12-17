@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from dictum_core.project import Project
@@ -440,306 +441,389 @@ def test_total_transformed_dimension(project: Project):
     assert len(result.iloc[:, -1].unique()) == 5
 
 
-# def test_total_filters(project: Project):
-#     """Test that filters are applied to the table transforms too (was a bug)"""
-#     select = (
-#         project.select(project.m.revenue.total())
-#         .by(project.d.genre)
-#         .where(project.d.genre.isin("Rock", "Alternative & Punk"))
-#     )
-#     result = select.df()
-#     assert result["revenue__total"].unique()[0] == 1068.21
-
-
-# def test_percent_basic(project: Project):
-#     result = project.select(project.m.revenue.percent()).by(project.d.genre).df()
-#     assert result.shape == (24, 2)
-#     assert result["revenue__percent_of_genre"].sum() == 1
-
-
-# def test_percent_of(project: Project):
-#     result = project.select("revenue.percent of (artist)").by("genre", "artist").df()
-#     unique = (
-#         result.groupby("genre")["revenue__percent_of_artist_within_genre"]
-#         .sum()
-#         .round(4)
-#         .unique()
-#     )
-#     assert unique.size == 1
-#     assert unique[0] == 1.0
-
-
-# def test_percent_within(project: Project):
-#     result = project.select("revenue.percent within (genre)").by("genre", "artist").df()
-#     unique = (
-#         result.groupby("genre")["revenue__percent_of_artist_within_genre"]
-#         .sum()
-#         .round(4)
-#         .unique()
-#     )
-#     assert unique.size == 1
-#     assert unique[0] == 1.0
-
-
-# def test_percent_of_within(project: Project):
-#     result = (
-#         project.select(
-#             "revenue",
-#             "revenue.percent of (artist) within (genre)",
-#         ).by("genre", "artist", "album")
-#         # .where("artist = 'Faith No More'")
-#         .df()
-#     )
-#     values = result.query("genre == 'TV Shows' and artist == 'The Office'")[
-#         "revenue__percent_of_artist_within_genre"
-#     ].unique()
-#     assert len(values) == 1
-#     assert values.round(4)[0] == 0.3404
-
-
-# def test_percent_with_top(project: Project):
-#     """Percent should be calculated before top"""
-#     result = (
-#         project.select(project.m.revenue.percent())
-#         .by(project.d.genre)
-#         .having(project.m.revenue.top(5))
-#         .df()
-#     )
-#     assert result.shape == (5, 2)
-#     assert round(result["revenue__percent_of_genre"].sum(), 4) == 0.7752
-
-
-# def test_percent_with_top_within(project: Project):
-#     result = (
-#         project.select(
-#             project.m.revenue.percent(within=[project.d.genre]).name(
-#                 "artist_revenue_within_genre"
-#             )
-#         )
-#         .by(project.d.genre, project.d.artist)
-#         .having(project.m.revenue.top(1, within=[project.d.genre]))
-#         .df()
-#     )
-#     assert result.shape == (24, 3)
-#     assert result.columns[-1] == "artist_revenue_within_genre"  # alias works
-
-
-# def test_percent_integer(project: Project):
-#     """Check that the output type is handled correctly (float, not the original int)
-#     and that the percentages for unique values do not add up to 100%"""
-#     select = project.select(project.m.unique_paying_customers.percent()).by(
-#         project.d.genre
-#     )
-#     result = select.df()
-#     assert round(result["unique_paying_customers__percent_of_genre"].sum(), 2) == 7.46
-
-
-# def test_tops_with_matching_total_and_percent(project: Project):
-#     result = project.ql(
-#         """
-#     select revenue,
-#         revenue.percent of (customer_city) as "% of City Revenue",
-#         revenue.total within (customer_country) as "Total Revenue: Country"
-#     by customer_country, customer_city
-#     having revenue.top(5) of (customer_country),
-#         revenue.top(1) of (customer_city) within (customer_country)
-#     """
-#     ).df()
-#     assert result.shape == (5, 5)
-
-
-# def test_format_metric(project: Project):
-#     result = project.select(project.m.revenue).df(format=True)
-#     assert result.columns[0] == "Revenue"  # column name comes from the metric name
-#     assert result.iloc[0, 0] == "$2,328.60"  # the value is formatted
-
-
-# def test_format_dimension_name(project: Project):
-#     result = project.select(project.m.revenue).by(project.d.genre).df(format=True)
-#     assert list(result.columns) == ["Genre", "Revenue"]
-
-
-# def test_format_transform(project: Project):
-#     result = (
-#         project.select(project.m.revenue)
-#         .by(project.d.invoice_date.year)
-#         .df(format=True)
-#     )
-#     assert list(result.columns) == ["Invoice Date (year)", "Revenue"]
-#     assert result.iloc[0, 0] == "2009"
-
-
-# def test_format_dimension_transform_alias(project: Project):
-#     result = (
-#         project.select(project.m.revenue.percent().name("Percent of Revenue"))
-#         .by(project.d.invoice_date.year.name("Year"))
-#         .df(format=True)
-#     )
-#     assert list(result.columns) == ["Year", "Percent of Revenue"]
-
-
-# def test_filtered_table(project: Project):
-#     result = project.select(project.m.rock_revenue).df()
-#     assert result.iloc[0, 0] == 826.65
-
-
-# def test_filtered_measure(project: Project):
-#     result = project.select("music_revenue").df()
-#     assert result.iloc[0, 0] == 2107.71
-
-
-# def test_filtered_and_unfiltered_measures_together(project: Project):
-#     result = project.select("revenue", "music_revenue").df()
-#     assert next(result.itertuples(index=False)) == (2328.6, 2107.71)
-
-
-# def test_generic_time(project: Project):
-#     result = project.select("revenue").by("Time.datetrunc('year')").df()
-#     assert result.shape == (5, 2)
-
-
-# def test_generic_time_alias_display_name(project: Project):
-#     result = project.select("revenue").by("Year as test").df(format=True)
-#     assert result.columns[0] == "test"
-
-
-# def test_generic_time_format(project: Project):
-#     result = project.select("revenue").by("Year").df(format=True)
-#     assert result.iloc[0]["Year"] == "2009"
-
-
-# @pytest.mark.parametrize(
-#     "dimension,n",
-#     [
-#         ("Year", 5),
-#         ("Quarter", 20),
-#         ("Month", 60),
-#         ("Week", 202),
-#         ("Day", 354),
-#         ("Date", 354),
-#     ],
-# )
-# def test_generic_time_trunc(project: Project, dimension: str, n: int):
-#     result = project.select("revenue").by(dimension).df()
-#     assert result.shape == (n, 2)
-
-
-# def test_generic_time_trunc_transform(project: Project):
-#     result = project.select("revenue").by("Month.datetrunc('year')").df()
-#     assert result.shape == (5, 2)
-
-
-# # TODO: decide what to do with this, as total works too
-# @pytest.mark.xfail
-# def test_sum_table_transform(project: Project):
-#     result = project.select("revenue.sum").by("genre").df()
-#     assert result["revenue__sum"].unique().size == 1
-#     assert result["revenue__sum"].unique()[0] == 2328.6
-
-
-# @pytest.mark.xfail
-# def test_sum_table_transform_within(project: Project):
-#     result = (
-#         project.select("revenue", "revenue.sum() within (genre)")
-#         .by("genre", "artist")
-#         .df()
-#     )
-#     gb = result.groupby("genre").aggregate(
-#         {"revenue": "sum", "revenue__sum_within_genre": "max"}
-#     )
-#     assert (gb["revenue"].round(2) == gb["revenue__sum_within_genre"]).all()
-
-
-# def test_measure_with_related_column(project: Project):
-#     """Test that related columns are supported in measures"""
-#     project.select("unique_paying_customers").df()  # no error
-
-
-# def test_default_time_format(project: Project):
-#     result = project.select("revenue").by("invoice_date").df(format=True)
-#     assert result.iloc[0]["Invoice Date"] == "1/1/2009"
-
-
-# def test_percents_without_alias(project: Project):
-#     """Bug found writing the docs. Something is wrong when running this query, fails
-#     in the pandas merge Visitor with KeyError, column not found.
-#     """
-#     (
-#         project.select(
-#             "revenue.percent within (invoice_date.year)",
-#             "revenue.percent of (invoice_date.quarter) within (invoice_date.year)",
-#         )
-#         .by("invoice_date.year", "invoice_date.quarter", "invoice_date.month")
-#         .df()
-#     )
-
-
-# def test_total_of_within_keyerror(project: Project):
-#     """Bug found writing the docs, similar to the above"""
-#     (
-#         project.select(
-#             "revenue.total within (Year)",
-#             "revenue.total of (Year)",
-#         ).by("Year", "Quarter")
-#     ).df()
-
-
-# @pytest.mark.xfail
-# def test_total_with_sum(project: Project):
-#     """Bug: When two metrics are requested, on SQLite PandasCompiler is used
-#     to calculate the window, and it was implemented incorrectly, resulting in an error.
-#     """
-#     project.select("revenue.total", "revenue.sum").by("genre").df()
-
-
-# @pytest.mark.xfail
-# def test_running_sum_single(project: Project):
-#     df = project.select("revenue.running_sum within (Year)").by("Year", "Month").df()
-#     assert df["revenue__running_sum_within_Year"].max() == 481.45
-
-
-# @pytest.mark.xfail
-# def test_running_sum_multiple(project: Project):
-#     df = (
-#         project.select(
-#             "items_sold",  # select multiple measures
-#             "revenue.sum within (Year)",
-#             "revenue.running_sum within (Year)",
-#         )
-#         .by("Year", "Month")
-#         .df()
-#     )
-#     assert df["revenue__running_sum_within_Year"].max() == 481.45
-
-
-# def test_literal_limit(project: Project):
-#     df = project.select("revenue").by("genre").limit(5).df()
-#     assert df.shape == (5, 2)
-
-
-# def test_select_union(project: Project):
-#     df = project.select("n_customers").by("country").df()
-#     assert df.shape == (24, 2)
-
-
-# def test_select_having_metric(project: Project):
-#     df = project.select("revenue").by("genre").having("revenue > 100").df()
-#     assert df.shape == (4, 2)
-
-#     df = (
-#         project.select("revenue", "revenue.total")
-#         .by("genre")
-#         .having("revenue > 100")
-#         .df()
-#     )
-#     assert df.shape == (4, 3)
-
-
-# def test_select_having_table_transform(project: Project):
-#     df = (
-#         project.select("revenue", "revenue.percent")
-#         .by("genre")
-#         .having("revenue.percent >= 0.01")
-#         .df()
-#     )
-#     assert df.shape == (13, 3)
+def test_total_filters(project: Project):
+    """Test that filters are applied to the table transforms too (was a bug)"""
+    result = project.ql(
+        """
+    from example:chinook
+    filter genre in ('Rock', 'Alternative & Punk')
+    select :genre, $revenue.total
+    """
+    ).df()
+    assert result["revenue_total"].unique()[0] == 1068.21
+
+
+def test_percent_basic(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    select :genre, $revenue.percent
+    """
+    ).df()
+    assert result.shape == (24, 2)
+    assert result["revenue_percent_of_genre"].sum() == 1
+
+
+def test_percent_of(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    select :genre, :artist,
+        $revenue.percent of (artist)
+    """
+    ).df()
+    unique = (
+        result.groupby("genre")["revenue_percent_of_artist_within_genre"]
+        .sum()
+        .round(4)
+        .unique()
+    )
+    assert unique.size == 1
+    assert unique[0] == 1.0
+
+
+def test_percent_within(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    select :genre, :artist, $revenue.percent within (genre)
+    """
+    ).df()
+    unique = (
+        result.groupby("genre")["revenue_percent_of_artist_within_genre"]
+        .sum()
+        .round(4)
+        .unique()
+    )
+    assert unique.size == 1
+    assert unique[0] == 1.0
+
+
+def test_percent_of_within(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    select :genre, :artist, :album,
+        $revenue, $revenue.percent of (artist) within (genre)
+    """
+    ).df()
+    values = result.query("genre == 'TV Shows' and artist == 'The Office'")[
+        "revenue_percent_of_artist_within_genre"
+    ].unique()
+    assert len(values) == 1
+    assert values.round(4)[0] == 0.3404
+
+
+def test_percent_with_top(project: Project):
+    """Percent should be calculated after top"""
+    result = project.ql(
+        """
+    from example:chinook
+    filter genre where revenue.top(5)
+    select :genre, $revenue.percent
+    """
+    ).df()
+    assert result.shape == (5, 2)
+    assert round(result["revenue_percent_of_genre"].sum(), 4) == 1
+
+
+def test_declare_alias(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    declare tmp = $revenue
+    select :genre, test = $tmp
+    """
+    ).df()
+    assert tuple(result.columns) == ("genre", "test")
+
+
+def test_declare_scalar_filter(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    declare tmp = $revenue
+    filter music
+    select
+        a = $revenue,
+        b = $tmp,
+    """
+    ).df()
+    pd.testing.assert_frame_equal(result, pd.DataFrame({"a": [2107.71], "b": [2328.6]}))
+
+
+def test_declare_table_filter(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    declare tmp = $revenue
+    filter genre where revenue.top(5)
+    select a = $revenue, b = $tmp
+    """
+    ).df()
+    pd.testing.assert_frame_equal(result, pd.DataFrame({"a": [1805.24], "b": [2328.6]}))
+
+
+def test_percent_with_top_within(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    filter :artist where $revenue.top(1) within (:genre)
+    select :genre, :artist,
+        artist_revenue_within_genre = $revenue.percent within (:genre)
+    """
+    ).df()
+    assert result.shape == (24, 3)
+    assert result.columns[-1] == "artist_revenue_within_genre"  # alias works
+
+
+def test_percent_integer(project: Project):
+    """Check that the output type is handled correctly (float, not the original int)
+    and that the percentages for unique values do not add up to 100%"""
+    result = project.ql(
+        """
+    from example:chinook
+    select :genre, $unique_paying_customers.percent
+    """
+    ).df()
+    assert round(result["unique_paying_customers_percent_of_genre"].sum(), 2) == 7.46
+
+
+def test_tops_with_matching_total_and_percent(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    filter
+        customer_country where revenue.top(5),
+        customer_city where revenue.top(1) within (customer_country),
+    select :customer_country, :customer_city,
+        $revenue,
+        "% of City Revenue" = $revenue.percent of (customer_city),
+        "Revenue Total: Country" = $revenue.total within (customer_country),
+
+    """
+    ).df()
+    assert result.shape == (5, 5)
+
+
+def test_format_metric(project: Project):
+    result = project.ql("from example:chinook select $revenue").df(format=True)
+    assert result.columns[0] == "Revenue"  # column name comes from the metric name
+    assert result.iloc[0, 0] == "$2,328.60"  # the value is formatted
+
+
+def test_format_dimension_name(project: Project):
+    result = project.ql("from example:chinook select :genre, $revenue").df(format=True)
+    assert list(result.columns) == ["Genre", "Revenue"]
+
+
+def test_format_transform(project: Project):
+    result = project.ql("from example:chinook select :invoice_date.year, $revenue").df(
+        format=True
+    )
+    assert list(result.columns) == ["Invoice Date (year)", "Revenue"]
+    assert result.iloc[0, 0] == "2009"
+
+
+def test_format_dimension_transform_alias(project: Project):
+    result = project.ql(
+        """
+    from example:chinook
+    select Year = :invoice_date.year,
+        "Percent of Revenue" = $revenue.percent,
+    """
+    ).df(format=True)
+    assert list(result.columns) == ["Year", "Percent of Revenue"]
+
+
+def test_filtered_table(project: Project):
+    result = project.ql("from example:chinook select $rock_revenue").df()
+    assert result.iloc[0, 0] == 826.65
+
+
+def test_filtered_measure(project: Project):
+    result = project.ql("from example:chinook select $music_revenue").df()
+    assert result.iloc[0, 0] == 2107.71
+
+
+def test_filtered_and_unfiltered_measures_together(project: Project):
+    result = project.ql("from example:chinook select $revenue, $music_revenue").df()
+    assert next(result.itertuples(index=False)) == (2328.6, 2107.71)
+
+
+def test_generic_time(project: Project):
+    result = project.ql(
+        "from example:chinook select :Time.datetrunc('year'), $revenue"
+    ).df()
+    assert result.shape == (5, 2)
+
+
+def test_generic_time_alias_display_name(project: Project):
+    result = project.ql("from example:chinook select test = :Year, $revenue").df(
+        format=True
+    )
+    assert result.columns[0] == "test"
+
+
+def test_generic_time_format(project: Project):
+    result = project.ql("from example:chinook select :Year, $revenue").df(format=True)
+    assert result.iloc[0]["Year"] == "2009"
+
+
+@pytest.mark.parametrize(
+    "dimension,n",
+    [
+        ("Year", 5),
+        ("Quarter", 20),
+        ("Month", 60),
+        ("Week", 202),
+        ("Day", 354),
+        ("Date", 354),
+    ],
+)
+def test_generic_time_trunc(project: Project, dimension: str, n: int):
+    result = project.ql(f"from example:chinook select :{dimension}, $revenue").df()
+    assert result.shape == (n, 2)
+
+
+def test_generic_time_trunc_transform(project: Project):
+    result = project.ql(
+        "from example:chinook select :Month.datetrunc('year'), $revenue"
+    ).df()
+    assert result.shape == (5, 2)
+
+
+# TODO: decide what to do with this, as total works too
+@pytest.mark.xfail
+def test_sum_table_transform(project: Project):
+    result = project.select("revenue.sum").by("genre").df()
+    assert result["revenue__sum"].unique().size == 1
+    assert result["revenue__sum"].unique()[0] == 2328.6
+
+
+@pytest.mark.xfail
+def test_sum_table_transform_within(project: Project):
+    result = (
+        project.select("revenue", "revenue.sum() within (genre)")
+        .by("genre", "artist")
+        .df()
+    )
+    gb = result.groupby("genre").aggregate(
+        {"revenue": "sum", "revenue__sum_within_genre": "max"}
+    )
+    assert (gb["revenue"].round(2) == gb["revenue__sum_within_genre"]).all()
+
+
+def test_measure_with_related_column(project: Project):
+    """Test that related columns are supported in measures"""
+    project.ql("from example:chinook select $unique_paying_customers").df()  # no error
+
+
+def test_default_time_format(project: Project):
+    result = project.ql("from example:chinook select :invoice_date, $revenue").df(
+        format=True
+    )
+    assert result.iloc[0]["Invoice Date"] == "1/1/2009"
+
+
+def test_percents_without_alias(project: Project):
+    """Bug found writing the docs. Something is wrong when running this query, fails
+    in the pandas merge Visitor with KeyError, column not found.
+    """
+    project.ql(
+        """
+    from example:chinook
+    select :invoice_date.year,
+        :invoice_date.quarter,
+        :invoice_date.month,
+        $revenue.percent within (invoice_date.year),
+        $revenue.percent of (invoice_date.quarter) within (invoice_date.year),
+    """
+    ).df()
+
+
+def test_total_of_within_keyerror(project: Project):
+    """Bug found writing the docs, similar to the above"""
+    project.ql(
+        """
+    from example:chinook
+    select :Year, :Quarter,
+        $revenue.total within (Year),
+        $revenue.total of (Year),
+    """
+    ).df()
+
+
+@pytest.mark.xfail
+def test_total_with_sum(project: Project):
+    """Bug: When two metrics are requested, on SQLite PandasCompiler is used
+    to calculate the window, and it was implemented incorrectly, resulting in an error.
+    """
+    project.select("revenue.total", "revenue.sum").by("genre").df()
+
+
+@pytest.mark.xfail
+def test_running_sum_single(project: Project):
+    df = project.select("revenue.running_sum within (Year)").by("Year", "Month").df()
+    assert df["revenue__running_sum_within_Year"].max() == 481.45
+
+
+@pytest.mark.xfail
+def test_running_sum_multiple(project: Project):
+    df = (
+        project.select(
+            "items_sold",  # select multiple measures
+            "revenue.sum within (Year)",
+            "revenue.running_sum within (Year)",
+        )
+        .by("Year", "Month")
+        .df()
+    )
+    assert df["revenue__running_sum_within_Year"].max() == 481.45
+
+
+def test_literal_limit(project: Project):
+    df = project.ql(
+        """
+    from example:chinook
+    select :genre, $revenue
+    limit 5
+    """
+    ).df()
+    assert df.shape == (5, 2)
+
+
+def test_select_union(project: Project):
+    df = project.ql("from example:chinook select :country, $n_customers").df()
+    assert df.shape == (24, 2)
+
+
+def test_select_having_metric(project: Project):
+    df = project.ql(
+        """
+    from example:chinook
+    filter genre where revenue > 100
+    select :genre, $revenue
+    """
+    ).df()
+    assert df.shape == (4, 2)
+
+    df = project.ql(
+        """
+    from example:chinook
+    filter genre where revenue > 100
+    select :genre, $revenue, $revenue.total
+    """
+    ).df()
+    assert df.shape == (4, 3)
+
+
+def test_select_having_table_transform(project: Project):
+    df = project.ql(
+        """
+    from example:chinook
+    filter genre where revenue.percent >= 1%
+    select :genre, $revenue, $revenue.percent
+    """
+    ).df()
+    assert df.shape == (13, 3)

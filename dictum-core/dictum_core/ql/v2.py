@@ -39,6 +39,9 @@ class Preprocessor(Transformer):
     def FLOAT(self, token: Token):
         return float(token.value)
 
+    def PERCENTAGE(self, token: Token):
+        return float(token.value.strip("%")) / 100
+
     def STRING(self, token: Token):
         return token.value.strip("'")
 
@@ -120,7 +123,7 @@ class Compiler(Transformer):
 
     def dimension_request(self, children: list):
         *alias, dimension = children
-        alias = alias[0].children[0] if alias else dimension.name
+        alias = alias[0].children[0] if alias else None
         return QueryDimensionRequest.parse_obj({**dimension.dict(), "alias": alias})
 
     def metric(self, children: list):
@@ -136,7 +139,7 @@ class Compiler(Transformer):
 
     def metric_request(self, children: list):
         *alias, metric = children
-        alias = alias[0].children[0] if alias else metric.name
+        alias = alias[0].children[0] if alias else None
         return QueryMetricRequest.parse_obj({**metric.dict(), "alias": alias})
 
     def scalar_filter(self, children: list):
@@ -163,7 +166,7 @@ class Compiler(Transformer):
 
     def declare(self, children: list):
         alias, metric = children
-        return QueryMetricDeclaration(alias=alias, metric=metric)
+        return QueryMetricDeclaration(alias=alias, **metric.dict())
 
     def source(self, children: list):
         kind, value = children

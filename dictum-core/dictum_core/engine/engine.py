@@ -10,8 +10,9 @@ from dictum_core.engine.graph.operators import FinalizeOperator
 from dictum_core.engine.graph.query import (
     Query,
     QueryDimensionRequest,
+    QueryMetricDeclaration,
     QueryMetricRequest,
-    QueryTransform,
+    QueryMetricWindow,
 )
 from dictum_core.engine.result import DisplayInfo
 
@@ -32,33 +33,35 @@ def _prep_query_of_within(query: Query) -> Query:
     TOP/BOTTOM transforms: OF is everything that's not WITHIN.
     PERCENT transform: fill in OF and WITHIN with missing dimensions if empty.
     """
-    query = query.copy(deep=True)
-    dims = [r.dimension for r in query.dimensions]
-    for metric in chain(query.table_filters, (r.metric for r in query.metrics)):
-        if metric.transform is None:
+    query: Query = query.copy(deep=True)
+    dims = [r for r in query.select if isinstance(r, QueryDimensionRequest)]
+    declared = [
+        x for x in query.cube.qualifiers if isinstance(x, QueryMetricDeclaration)
+    ]
+    for request in chain(query.select, declared):
+        if (
+            isinstance(request, QueryDimensionRequest)
+            or request.table_transform is None
+        ):
             continue
 
-        transform = metric.transform
+        t = request.table_transform
+        w = request.window or QueryMetricWindow()
 
-        withins = {w.digest for w in metric.transform.within}
-        ofs = {o.digest for o in metric.transform.of}
+        withins = {w.digest for w in w.within}
+        ofs = {o.digest for o in w.of}
 
-        if transform.id in {"top", "bottom"} and len(transform.of) == 0:
-            transform.of = [d for d in dims if d.digest not in withins]
+        # if t.id in {"top", "bottom"} and len(transform.of) == 0:
+        #     transform.of = [d for d in dims if d.digest not in withins]
 
-        if metric.transform.id == "percent":
-            if len(transform.of) == 0:
-                transform.of = [d for d in dims if d.digest not in withins]
-                continue
-            if len(transform.within) == 0:
-                transform.within = [d for d in dims if d.digest not in ofs]
-                continue
+        if t.id == "percent":
+            if len(w.of) == 0:
+                w.of = [d for d in dims if d.digest not in withins]
+            elif len(w.within) == 0:
+                w.within = [d for d in dims if d.digest not in ofs]
 
-    for metric in query.table_filters:
-        if metric.transform is None:
-            # TODO: support this at the level of QL allowing e.g.
-            #       HAVING revenue within (genre) > 100
-            metric.transform = QueryTransform(id="total", within=dims)
+        if next(chain(w.of, w.within), None) is not None:
+            request.window = w
 
     return query
 
@@ -71,7 +74,7 @@ class Engine:
         # FIXME: turn on
         # check_query(self.model, query)
 
-        # query = _prep_query_of_within(query)
+        query = _prep_query_of_within(query)
 
         metrics = [r for r in query.select if isinstance(r, QueryMetricRequest)]
         dimensions = [r for r in query.select if isinstance(r, QueryDimensionRequest)]
@@ -87,7 +90,23 @@ class Engine:
         )
 
         graph = builder.get_graph()
+
+        declared_requests = {}
+        for item in query.cube.qualifiers:
+            if isinstance(item, QueryMetricDeclaration):
+                declared_requests[item.alias] = item
+
+        digest_requests = {r.digest: r for r in query.select}
+        for request in query.select:
+            if request.id in declared_requests:
+                dreq = declared_requests[request.id].copy(deep=True)
+                if request.alias is not None:
+                    dreq.alias = request.alias
+                digest_requests[request.digest] = dreq
+
         display_info = {
-            r.digest: DisplayInfo.from_request(self.model, r) for r in query.select
+            d: DisplayInfo.from_request(self.model, r)
+            for d, r in digest_requests.items()
         }
+        self.model.temp_metrics = {}  # clear the temp metrics
         return FinalizeOperator(graph, display_info=display_info)

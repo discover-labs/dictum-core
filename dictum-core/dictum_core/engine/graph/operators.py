@@ -12,7 +12,6 @@ from dictum_core.backends.pandas import PandasCompiler
 from dictum_core.engine.computation import Column
 from dictum_core.engine.query import QueryDimension
 from dictum_core.engine.result import DisplayInfo, Result
-from dictum_core.exceptions import ShoudntHappenError
 from dictum_core.utils.expr import value_to_token
 
 
@@ -63,6 +62,11 @@ class Operator:
         for upstream in self._upstreams:
             yield from upstream.walk_graph()
         yield self
+
+    def find_node(self, digest: str):
+        for node in self.walk_graph():
+            if node.digest.startswith(digest):
+                return node
 
     @property
     def upstreams_digest(self) -> str:
