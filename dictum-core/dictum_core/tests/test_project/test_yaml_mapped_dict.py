@@ -2,12 +2,14 @@ from pathlib import Path
 
 import yaml
 
-from dictum_core.examples import chinook
+from dictum_core import examples
 from dictum_core.project.yaml_mapped_dict import YAMLMappedDict
+
+chinook_path = Path(examples.__file__).parent / "chinook"
 
 
 def test_from_path():
-    path = Path(chinook.__file__).parent / "metrics"
+    path = chinook_path / "metrics"
     result = YAMLMappedDict.from_path(path)
     assert "revenue" in result
     assert isinstance(result["revenue"], YAMLMappedDict)

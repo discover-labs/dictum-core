@@ -240,6 +240,10 @@ def test_expr_kind_invalid():
         get_expr_kind(parse_expr("col in (sum(col), 1, 2)"))
 
 
+def test_expr_kind_scalar_function_no_args():
+    assert get_expr_kind(parse_expr("today()")) == "scalar"
+
+
 def test_expr_total_function():
     assert get_expr_total_function(parse_expr("sum(col)")) == "sum"
     assert get_expr_total_function(parse_expr("sum(col + 1)")) == "sum"

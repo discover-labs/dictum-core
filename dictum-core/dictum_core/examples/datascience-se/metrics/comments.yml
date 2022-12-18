@@ -1,0 +1,4 @@
+name: Comments
+expr: count()
+time: comment_creation_date
+table: comments

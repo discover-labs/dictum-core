@@ -1,6 +1,7 @@
 from dictum_core.ql.transformer import (
     compile_dimension,
     compile_dimension_request,
+    compile_metric,
     compile_metric_request,
     compile_query,
 )

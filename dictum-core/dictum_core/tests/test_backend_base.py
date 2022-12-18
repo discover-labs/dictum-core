@@ -29,21 +29,21 @@ def test_compiler_case():
 def test_sqlalchemy_no_default_schema():
     backend = SQLAlchemyBackend()
     with mock.patch("dictum_core.backends.sql_alchemy.Table") as Table:
-        backend.table("table")
+        backend.table("table", "table")
         assert Table.call_args[1]["schema"] is None
 
 
 def test_sqlalchemy_default_schema():
     backend = SQLAlchemyBackend(default_schema="test")
     with mock.patch("dictum_core.backends.sql_alchemy.Table") as Table:
-        backend.table("table")
+        backend.table("table", "table")
         assert Table.call_args[1]["schema"] == "test"
 
 
 def test_sqlalchemy_override_default_schema():
     backend = SQLAlchemyBackend(default_schema="test")
     with mock.patch("dictum_core.backends.sql_alchemy.Table") as Table:
-        backend.table("table", schema="override")
+        backend.table(dict(table="table", schema="override"), "table")
         assert Table.call_args[1]["schema"] == "override"
 
 

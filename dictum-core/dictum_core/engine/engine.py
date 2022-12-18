@@ -1,18 +1,20 @@
 from copy import deepcopy
+from itertools import chain
 
 from lark import Tree
-from toolz import compose_left
 
-from dictum_core import model, schema
-from dictum_core.engine.aggregate_query_builder import AggregateQueryBuilder
+from dictum_core import model
 from dictum_core.engine.checks import check_query
-from dictum_core.engine.computation import LiteralOrderItem, RelationalQuery
-from dictum_core.engine.metrics import AddMetric, limit_transforms, transforms
-from dictum_core.engine.operators import (
-    FinalizeOperator,
-    MaterializeOperator,
-    MergeOperator,
+from dictum_core.engine.graph.builders import MetricsGraphBuilder
+from dictum_core.engine.graph.operators import FinalizeOperator
+from dictum_core.engine.graph.query import (
+    Query,
+    QueryDimensionRequest,
+    QueryMetricDeclaration,
+    QueryMetricRequest,
+    QueryMetricWindow,
 )
+from dictum_core.engine.result import DisplayInfo
 
 
 def metric_expr(expr: Tree):
@@ -23,55 +25,88 @@ def metric_expr(expr: Tree):
     return expr
 
 
+# TODO: do this at another step so it doesn't affect names
+def _prep_query_of_within(query: Query) -> Query:
+    """Additionaly prepare query's OF statements and WITHIN statements.
+    This is tranform-specific.
+
+    TOP/BOTTOM transforms: OF is everything that's not WITHIN.
+    PERCENT transform: fill in OF and WITHIN with missing dimensions if empty.
+    """
+    query: Query = query.copy(deep=True)
+    dims = [r for r in query.select if isinstance(r, QueryDimensionRequest)]
+    declared = [
+        x for x in query.cube.qualifiers if isinstance(x, QueryMetricDeclaration)
+    ]
+    for request in chain(query.select, declared):
+        if (
+            isinstance(request, QueryDimensionRequest)
+            or request.table_transform is None
+        ):
+            continue
+
+        t = request.table_transform
+        w = request.window or QueryMetricWindow()
+
+        withins = {w.digest for w in w.within}
+        ofs = {o.digest for o in w.of}
+
+        # if t.id in {"top", "bottom"} and len(transform.of) == 0:
+        #     transform.of = [d for d in dims if d.digest not in withins]
+
+        if t.id == "percent":
+            if len(w.of) == 0:
+                w.of = [d for d in dims if d.digest not in withins]
+            elif len(w.within) == 0:
+                w.within = [d for d in dims if d.digest not in ofs]
+
+        if next(chain(w.of, w.within), None) is not None:
+            request.window = w
+
+    return query
+
+
 class Engine:
     def __init__(self, model: "model.Model"):
         self.model = model
 
-    def suggest_dimensions(self, query: schema.Query):
-        ...
+    def get_computation(self, query: Query) -> FinalizeOperator:
+        # FIXME: turn on
+        # check_query(self.model, query)
 
-    def suggest_measures(self, query: schema.Query):
-        ...
+        query = _prep_query_of_within(query)
 
-    def get_range_computation(self, dimension_id: str) -> RelationalQuery:
-        ...
+        metrics = [r for r in query.select if isinstance(r, QueryMetricRequest)]
+        dimensions = [r for r in query.select if isinstance(r, QueryDimensionRequest)]
+        select = [r.digest for r in query.select]
 
-    def get_values_computation(self, dimension_id: str) -> RelationalQuery:
-        ...
-
-    def get_terminal(self, query: "schema.Query") -> MergeOperator:
-        builder = AggregateQueryBuilder(
-            model=self.model, dimensions=query.dimensions, filters=query.filters
+        builder = MetricsGraphBuilder(
+            model=self.model,
+            cube=query.cube,
+            metrics=metrics,
+            dimensions=dimensions,
+            select=select,
+            limit=query.limit,
         )
 
-        merge = MergeOperator(query=query)
+        graph = builder.get_graph()
 
-        # add metrics
-        adders = []
-        for request in query.metrics:
-            if len(request.metric.transforms) == 0:
-                adders.append(AddMetric(request=request, builder=builder))
-            elif len(request.metric.transforms) == 1:
-                transform_id = request.metric.transforms[0].id
-                adder = transforms.get(transform_id)
-                if adder is None:
-                    raise KeyError(f"Transform {transform_id} does not exist")
-                adders.append(adder(request=request, builder=builder))
+        declared_requests = {}
+        for item in query.cube.qualifiers:
+            if isinstance(item, QueryMetricDeclaration):
+                declared_requests[item.alias] = item
 
-        for metric in query.limit:
-            transform_id = metric.transforms[0].id
-            adder = limit_transforms.get(transform_id)
-            if adder is None:
-                raise KeyError(f"Transform {transform_id} does not exist")
-            adders.append(adder(metric=metric, builder=builder))
+        digest_requests = {r.digest: r for r in query.select}
+        for request in query.select:
+            if request.id in declared_requests:
+                dreq = declared_requests[request.id].copy(deep=True)
+                if request.alias is not None:
+                    dreq.alias = request.alias
+                digest_requests[request.digest] = dreq
 
-        return compose_left(*adders)(merge)
-
-    def get_computation(self, query: schema.Query) -> MergeOperator:
-        check_query(self.model, query)
-        terminal = self.get_terminal(query)
-        terminal.order = [LiteralOrderItem(r.digest, True) for r in query.dimensions]
-        return FinalizeOperator(
-            input=MaterializeOperator([terminal]),
-            aliases={r.digest: r.name for r in query.metrics + query.dimensions},
-        )
+        display_info = {
+            d: DisplayInfo.from_request(self.model, r)
+            for d, r in digest_requests.items()
+        }
+        self.model.temp_metrics = {}  # clear the temp metrics
+        return FinalizeOperator(graph, display_info=display_info)

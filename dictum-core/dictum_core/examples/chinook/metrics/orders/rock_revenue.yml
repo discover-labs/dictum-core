@@ -1,0 +1,7 @@
+name: Revenue for "Rock" Genre
+expr: sum(UnitPrice * Quantity)
+table: rock
+format: currency
+missing: 0
+time: invoice_date
+metric: True

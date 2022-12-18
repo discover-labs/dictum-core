@@ -18,12 +18,18 @@ dimension_parser = Lark.open(
 table_parser = Lark.open(
     "magics.lark", rel_to=grammars, start="table_full", propagate_positions=True
 )
-format_parser = Lark.open("magics.lark", rel_to=grammars, start="format")
+union_parser = Lark.open("magics.lark", rel_to=grammars, start="union")
 
 
 class Preprocessor(Transformer):
     def IDENTIFIER(self, token: Token):
         return token.value
+
+    def INTEGER(self, token: Token):
+        return int(token.value)
+
+    def FLOAT(self, token: Token):
+        return float(token.value)
 
     def identifier(self, children: list):
         return children[0]
@@ -39,15 +45,6 @@ class Preprocessor(Transformer):
 
     def ql__QUOTED_IDENTIFIER(self, token: Token):
         return token.value.strip('"')
-
-    def table_metric(self, children: list):
-        return children[0]
-
-    def table_dimension(self, children: list):
-        return children[0]
-
-    def table_related(self, children: list):
-        return children[0]
 
     def filter(self, children: list):
         """Inline expr node directly into filter"""
@@ -89,5 +86,5 @@ def parse_shorthand_related(definition: str) -> Tree:
 
 
 @catch_syntax_errors
-def parse_shorthand_format(definition: str) -> Tree:
-    return preprocessor.transform(format_parser.parse(definition))
+def parse_shorthand_union(definition: str) -> Tree:
+    return preprocessor.transform(union_parser.parse(definition))

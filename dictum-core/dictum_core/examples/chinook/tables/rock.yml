@@ -10,12 +10,3 @@ related:
 
 filters:
   - :genre = 'Rock'
-
-measures:
-  rock_revenue:
-    name: Revenue for "Rock" Genre
-    expr: sum(UnitPrice * Quantity)
-    format: currency
-    missing: 0
-    time: invoice_date
-    metric: True

@@ -35,7 +35,8 @@ from altair.vegalite.v4.api import _EncodingMixin
 from jsonschema.exceptions import ValidationError
 from toolz.curried import curry
 
-from dictum_core.engine.computation import DisplayInfo
+from dictum_core.engine.query import Query, QueryMetricRequest
+from dictum_core.engine.result import DisplayInfo
 from dictum_core.project.altair.data import DictumData
 from dictum_core.project.altair.encoding import AltairEncodingChannelHook, filter_fields
 from dictum_core.project.altair.locale import (
@@ -43,7 +44,6 @@ from dictum_core.project.altair.locale import (
     cldr_locale_to_d3_time,
 )
 from dictum_core.ql.transformer import compile_dimension_request, compile_metric_request
-from dictum_core.schema.query import Query, QueryMetricRequest
 
 
 def is_channel_cls(obj):
@@ -307,14 +307,14 @@ def render_self(self):
                 if isinstance(channel, Text) and fmt is not None:
                     channel.format = fmt
 
-        # add default tooltip if necessary
-        tooltip_unit = unit
-        if "spec" in unit._kwds:
-            tooltip_unit = unit.spec
-        if tooltip_unit.encoding.tooltip is Undefined:
-            tooltip_unit.encoding.tooltip = build_default_tooltip(
-                query, result.display_info
-            )
+            # add default tooltip if necessary
+            tooltip_unit = unit
+            if "spec" in unit._kwds:
+                tooltip_unit = unit.spec
+            if tooltip_unit.encoding.tooltip is Undefined:
+                tooltip_unit.encoding.tooltip = build_default_tooltip(
+                    query, result.display_info
+                )
 
     if len(currencies) == 1:
         # if there's more than one currency per query, display no currency

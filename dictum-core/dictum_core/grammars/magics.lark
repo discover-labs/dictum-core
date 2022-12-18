@@ -1,6 +1,8 @@
 %import .expr.expr -> expr
 %import .expr.IDENTIFIER -> IDENTIFIER  // strict identifier
 %import .ql.identifier -> identifier    // possibly quoted identifier
+%import common.SIGNED_INT -> INTEGER
+%import common.SIGNED_FLOAT -> FLOAT
 
 id: IDENTIFIER
 type: IDENTIFIER
@@ -13,24 +15,30 @@ dimension: [ table "." ] id "=" expr "::" type [ "AS"i alias ] [ properties ]
 
 // filters are only available for measures (metrics with a table)
 metric: [ table "." ] id "=" expr [ filter ] [ "::" type ] [ "AS"i alias ] [ properties ]
+measure: [ table "." ] id "=" expr [ filter ] [ "::" type ] [ properties ]
+
 filter: "where" expr
 
 related: [ table "." ] alias "=" column "->" table [ "." column ]
 
-format: IDENTIFIER | key_value+
+_table_metric: "metric"i metric
+_table_dimension: "dimension"i dimension
+_table_related: "related"i related
+_table_measure: "measure"i measure
 
-table_metric: "metric"i metric
-table_dimension: "dimension"i dimension
-table_format: "format"i format
-table_related: "related"i related
+union: identifier "::" type [ "AS"i alias ]
 
-key_value: IDENTIFIER "=" ( identifier | key_values )  // value can be quoted or nested
+key_value: IDENTIFIER "=" ( _value | key_values )  // values can be nested
+_value: identifier | INTEGER | FLOAT
 key_values: "{" key_value+ "}"
 
 pk: "[" IDENTIFIER "]"
 source: IDENTIFIER | key_values
 table_def: table pk? source?
 
-table_full: table_def ( table_related | table_metric | table_dimension | table_format )*
+table_full: table_def ( _table_related | _table_metric | _table_dimension | _table_measure )*
+
+COMMENT: "#" /.*/
 
 %ignore /\s/
+%ignore COMMENT

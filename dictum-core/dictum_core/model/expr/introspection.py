@@ -140,6 +140,12 @@ def scalar(self, _):
 
 
 def _infer_kind(items: list):
+    if len(items) == 0:
+        # no expression is scalar
+        # this if for arguments of functions like today()
+        # non-aggregate and with no arguments
+        return ExprKind.scalar
+
     items = set(items)
 
     if len(items) == 1:

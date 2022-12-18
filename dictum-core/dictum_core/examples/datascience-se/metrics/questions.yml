@@ -1,0 +1,5 @@
+name: Questions
+expr: count()
+filter: :post_is_question
+time: post_date
+table: posts

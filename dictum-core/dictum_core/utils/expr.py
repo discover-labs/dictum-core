@@ -1,5 +1,5 @@
 import dataclasses
-from datetime import date, datetime
+from datetime import datetime
 
 from lark import Token, Tree
 
@@ -18,13 +18,11 @@ def value_to_token(value):
     if isinstance(value, int):
         return Token("INTEGER", str(value))
     if isinstance(value, float):
-        return Token("NUMBER", str(value))
+        return Token("FLOAT", str(value))
     if isinstance(value, str):
         return Token("STRING", value)
-    if isinstance(value, date):
-        return Token("DATE", value.strftime(r"%Y-%m-%d"))
     if isinstance(value, datetime):
-        return Token("DATETIME", value.strftime(r"%Y-%m-%d %H:%M:%S"))
+        return Token("DATETIME", value.isoformat())
     raise ValueError("Token values must by integers, floats or strings")
 
 

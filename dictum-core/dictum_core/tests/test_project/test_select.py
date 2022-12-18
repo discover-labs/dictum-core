@@ -1,3 +1,5 @@
+import pytest
+
 from dictum_core import Project
 from dictum_core.project import Select
 
@@ -31,3 +33,11 @@ def test_select_str(project: Project):
     assert "g" in df.columns
     assert "track_count" in df.columns
     assert df.iloc[0, 1] == 1297
+
+
+@pytest.mark.xfail
+def test_top_order(project: Project):
+    # TODO: fix this
+    df = project.select("revenue").by("country").having("revenue.top(5)").df()
+    assert df.shape == (5, 2)
+    assert df["revenue"].iloc[0] == df["revenue"].max()

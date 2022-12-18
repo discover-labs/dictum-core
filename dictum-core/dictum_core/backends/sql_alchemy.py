@@ -1,8 +1,9 @@
 import logging
 from functools import cached_property
-from typing import Any, Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 import sqlparse
+from dateutil.parser import isoparse
 from lark import Transformer, Tree
 from pandas import DataFrame, read_sql
 from sqlalchemy import (
@@ -24,18 +25,17 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.engine.url import URL
-from sqlalchemy.sql import Select
-from sqlalchemy.sql.functions import coalesce
+from sqlalchemy.sql import Alias, ClauseElement, Join, Select, Subquery, literal
 
-import dictum_core.model
 from dictum_core.backends.base import Backend, Compiler
 from dictum_core.backends.mixins.arithmetic import ArithmeticCompilerMixin
-from dictum_core.engine import Column, LiteralOrderItem, RelationalQuery
+from dictum_core.engine import Column, LiteralOrderItem
+from dictum_core.exceptions import ShoudntHappenError
 
 logger = logging.getLogger(__name__)
 
 
-def get_case_insensitive_column(obj, column: str):
+def _get_case_insensitive_column(obj, column: str):
     """SQL is case-insensitive, but SQLAlchemy isn't, because columns are stored
     in a dict-like structure, keys exactly as specified in the database. That's
     why this function is needed.
@@ -46,7 +46,29 @@ def get_case_insensitive_column(obj, column: str):
     for k, v in columns.items():
         if k.lower() == column.lower():
             return v
-    raise KeyError(f"Can't find column {column} in {obj.name}")
+    raise KeyError(f"Can't find column {column} in {obj}")
+
+
+def _get_tables(base: Union[Alias, Join, Select, Subquery]) -> dict:
+    if isinstance(base, Alias):
+        return {base.name: base}
+
+    if isinstance(base, Select):
+        return _get_tables(base.get_final_froms()[0])
+
+    result = {}
+    if isinstance(base, Join):
+        if isinstance(base.left, Join):
+            result.update(_get_tables(base.left))
+        elif isinstance(base.left, Alias):
+            result[base.left.name] = base.left
+
+        result[base.right.name] = base.right
+        return result
+
+    raise ShoudntHappenError(
+        f"Error in SQLAlchemy _get_tables: unhandled input type {type(base)}"
+    )
 
 
 class ColumnTransformer(Transformer):
@@ -62,20 +84,21 @@ class ColumnTransformer(Transformer):
             identity = None
         else:
             identity = ".".join(path)
-        return get_case_insensitive_column(self._tables[identity], field)
+        return _get_case_insensitive_column(self._tables[identity], field)
 
 
 class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
-    def __init__(self, backend: "SQLAlchemyBackend"):
-        self.backend = backend
-        super().__init__()
-
     def column(self, _):
         """A no-op. SQLAlchemy columns need to know about tables,
         so this transformation is done beforehand with ColumnTransformer.
         """
 
+    def DATETIME(self, value: str):
+        return isoparse(value)
+
     def IN(self, a, b):
+        if not isinstance(a, ClauseElement):
+            a = literal(a)
         return a.in_(b)
 
     def NOT(self, x):
@@ -86,6 +109,9 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
 
     def OR(self, a, b):
         return or_(a, b)
+
+    def exp(self, a, b):
+        return func.power(a, b)
 
     def isnull(self, value):
         return value == None  # noqa: E711
@@ -124,10 +150,10 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
                 col = col.asc() if asc else col.desc()
                 order_by.append(col)
             order = order_by
-        return super().call_window(fn, *args, partition, order, rows)
+        return super().call_window(fn, args, partition, order, rows)
 
-    def window_sum(self, arg, partition, order, rows):
-        return func.sum(arg).over(partition_by=partition, order_by=order)
+    def window_sum(self, args, partition, order, rows):
+        return func.sum(args[0]).over(partition_by=partition, order_by=order)
 
     def window_row_number(self, _, partition, order, rows):
         return func.row_number().over(partition_by=partition, order_by=order)
@@ -150,6 +176,9 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
     def datediff(self, part, start, end):
         return func.datediff(part, start, end)
 
+    def dateadd(self, part, interval, value):
+        return func.dateadd(part, interval, value)
+
     def now(self):
         return func.now()
 
@@ -171,198 +200,12 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
     def todatetime(self, arg):
         return cast(arg, DateTime)
 
-    def _table(self, source: Union[str, Dict]):
-        if isinstance(source, str):
-            return self.backend.table(source)
-        if isinstance(source, dict):
-            schema = source.get("schema")
-            table = source.get("table")
-            if table is None:
-                raise ValueError(f"table is required for a {self.type} backend")
-            return self.backend.table(table, schema)
-        raise ValueError(f"Source must be a str or a dict for a {self.type} backend")
-
-    def compile_query(self, query: RelationalQuery):
-        if isinstance(query.source, dictum_core.model.Table):
-            id_ = query.source.id
-            table = self._table(query.source.source)
-        elif isinstance(query.source, RelationalQuery):
-            id_ = None
-            table = self.compile_query(query.source)
-
-        tables = {id_: table}
-
-        # replaces column refs with actual SQLA column objs
-        column_transformer = ColumnTransformer(tables)
-
-        # join the tables
-        for join in query.joins:
-            if isinstance(join.right, RelationalQuery):
-                right_table = self.compile_query(join.right)
-            else:
-                right_table = self._table(join.right.source)
-            right_table = right_table.alias(join.right_identity)
-            tables[join.right_identity] = right_table
-            join_expr = self.transformer.transform(
-                column_transformer.transform(join.expr)
-            )
-            table = table.join(right_table, join_expr, isouter=(not join.inner))
-
-        # add calcs
-        columns = {}
-        for column in query.columns:
-            columns[column.name] = self.transformer.transform(
-                column_transformer.transform(column.expr)
-            )
-        groupby = []
-        for expr in query.groupby:
-            compiled = self.transformer.transform(column_transformer.transform(expr))
-            groupby.append(compiled)
-
-        stmt = (
-            select(*(v.label(k) for k, v in columns.items()))
-            .select_from(table)
-            .group_by(*groupby)
-        )
-
-        # apply filters
-        for expr in query.filters:
-            condition = self.transformer.transform(column_transformer.transform(expr))
-            stmt = stmt.where(condition)
-
-        # apply order and limit
-        # order only makes sense at this stage if there's a limit
-        if query.limit and query.order:
-            order_clauses = []
-            for item in query.order:
-                expr = self.transformer.transform(
-                    column_transformer.transform(item.expr)
-                )
-                if not item.ascending:
-                    expr = expr.desc()
-                order_clauses.append(expr)
-            stmt = stmt.order_by(*order_clauses).limit(query.limit)
-
-        return stmt
-
-    def merge_queries(self, queries: List[Select], merge_on: List[str]):
-        """Merge multiple queries. Wrap each in subquery and then full outer join them.
-        The join condition is constructed by chaining the coalesced statements:
-
-        If A and B are dimension columns and x, y, z are measures:
-
-        SELECT coalesce(coalesce(t1.A, t2.A), t3.A) as A,
-            coalesce(coalesce(t1.b, t2.B), t3.B) as B,
-            t1.x, t2.y, t3.z
-        FROM (...) as t1
-        FULL OUTER JOIN (...) as t2
-            ON t1.A = t2.A
-            AND t1.B = t2.B
-        FULL OUTER JOIN (...) as t3
-            ON coalesce(t1.A, t2.A) = t3.A
-            AND coalesce(t1.B, t2.B) = t3.B
-        """
-        subqueries = [q.subquery() for q in queries]
-        joined, *joins = subqueries
-
-        coalesced = {k: v for k, v in joined.c.items() if k in merge_on}
-
-        for join in joins:
-            # join on columns that are common between merge_on, the table that's being
-            # joined and the merge_on columns that were present so far in the already
-            # joined tables
-            on = set(merge_on) & set(coalesced) & set(join.c.keys())
-
-            # build the join condition
-            cond = (
-                and_(*(coalesced[c] == join.c[c] for c in on))
-                if len(on) > 0
-                else true()
-                # true() is when there's no merge_on
-                # or no common columns just cross join
-            )
-
-            # add the new join
-            joined = joined.outerjoin(join, cond, full=True)
-
-            # update the coalesced column list
-            for column in set(merge_on) & set(join.c.keys()):
-                if column in coalesced:
-                    coalesced[column] = coalesce(coalesced[column], join.c[column])
-                else:
-                    coalesced[column] = join.c[column]
-
-        # at this point we just need to select the coalesced columns
-        columns = []
-        for k, v in coalesced.items():
-            columns.append(v.label(k))
-
-        # and any other columns that are not in the coalesced mapping
-        for s in subqueries:
-            columns.extend(c for c in s.c if c.name not in coalesced)
-
-        return select(*columns).select_from(joined)
-
-    def calculate(self, query: Select, columns: List[Column]) -> Select:
-        result_columns = []
-        subquery = query.subquery()
-        transformer = ColumnTransformer({None: subquery})
-        for column in columns:
-            resolved_column = transformer.transform(column.expr)
-            sql_expr = self.transformer.transform(resolved_column).label(column.name)
-            result_columns.append(sql_expr)
-        return select(*result_columns).select_from(subquery)
-
-    def inner_join(self, query: Select, to_join: Select, join_on: List[str]):
-        to_join = to_join.subquery()
-        conditions = and_(
-            *(
-                query.selected_columns[col] == to_join.c[col]
-                for col in join_on
-                if col in to_join.c  # support uneven level of detail
-            )
-        )
-        return query.join(to_join, conditions)
-
-    def limit(self, query: Select, limit: int):
-        return query.limit(limit)
-
-    def order(self, query: Select, items: List[LiteralOrderItem]) -> Select:
-        clauses = []
-        for item in items:
-            clause = query.selected_columns[item.name]
-            clause = clause.asc() if item.ascending else clause.desc()
-            clauses.append(clause)
-        return query.order_by(*clauses)
-
-    def filter(self, query: Select, conditions: List[Tree]) -> Select:
-        query = query.subquery().select()
-        column_transformer = ColumnTransformer({None: query})
-        for expr in conditions:
-            condition = self.transformer.transform(column_transformer.transform(expr))
-            query = query.where(condition)
-        return query
-
-    def filter_with_records(self, query: Select, records: List[List[Dict[str, Any]]]):
-        if len(records) == 0:
-            return query
-
-        for recordset in records:
-            conditions = []
-            for record in recordset:
-                # some filter columns might be missing from the query
-                # for example if the query calculated a total
-                condition_list = [
-                    query.selected_columns[k] == v
-                    for k, v in record.items()
-                    if k in query.selected_columns
-                ]
-                if len(condition_list) > 0:
-                    conditions.append(and_(*condition_list))
-            if len(conditions) > 0:
-                query = query.where(or_(*conditions))
-
-        return query
+    def compile(self, expr: Tree, tables: dict):
+        ct = ColumnTransformer(tables)
+        result = self.transformer.transform(ct.transform(expr))
+        if isinstance(result, ClauseElement):
+            return result
+        return literal(result)
 
 
 class SQLAlchemyBackend(Backend):
@@ -409,7 +252,195 @@ class SQLAlchemyBackend(Backend):
     def execute(self, query: Select) -> DataFrame:
         return read_sql(query, self.engine, coerce_float=True)
 
-    def table(self, name: str, schema: Optional[str] = None) -> Table:
-        if schema is None:
-            schema = self.default_schema
-        return Table(name, self.metadata, schema=schema, autoload=True)
+    def table(self, source: Union[str, dict], identity: str) -> Select:
+        if isinstance(source, str):
+            source = {"table": source}
+        schema = source.setdefault("schema", self.default_schema)
+        return (
+            Table(source["table"], self.metadata, schema=schema, autoload=True)
+            .alias(identity)
+            .select()
+        )
+
+    def left_join(
+        self,
+        left: Select,
+        right: Select,
+        left_identity: str,
+        right_identity: str,
+        join_expr: Tree,
+    ) -> Select:
+        """
+        Left can be
+        - Select from an aliased table (inner: Alias)
+        - Select from a previous step in adding the joins (inner: Join)
+        - Select from the result of a merge (inner: Subquery)
+
+        Right can be
+        - Select from an aliased Table (inner: Alias)
+        - Select from a dimension subaggregation (inner: Join)
+        """
+        tables = {}
+
+        # deal with the left side
+        inner_left = left.get_final_froms()[0]
+        if isinstance(inner_left, Alias):  # just a table
+            tables.update({left_identity: inner_left})
+            left = inner_left
+        elif isinstance(inner_left, Join):  # previously joined
+            tables.update(_get_tables(inner_left))
+            left = inner_left
+        elif isinstance(inner_left, Subquery):  # merge result
+            left = left.alias(left_identity)  # add another subq
+            tables.update({left_identity: left})
+        else:
+            raise ShoudntHappenError(
+                f"Unexpected inner type in left item of LEFT JOIN: {type(inner_left)}"
+            )
+
+        # TODO: factorize duplicate code
+        # right side
+        inner_right = right.get_final_froms()[0]
+        if isinstance(inner_right, Alias):  # just a table
+            right = inner_right.alias(right_identity)
+            tables.update({right_identity: right})
+        elif isinstance(inner_right, Join):  # subagg
+            right = right.alias(right_identity)
+            tables.update({right_identity: right})
+        else:
+            raise ShoudntHappenError(
+                f"Unexpected inner type in right item of LEFT JOIN: {type(inner_right)}"
+            )
+
+        onclause = self.compile(join_expr, tables)
+        return left.join(right, onclause=onclause, isouter=True).select()
+
+    def aggregate(
+        self, base: Select, groupby: List[Column], aggregate: List[Column]
+    ) -> Select:
+        """Aggregate. The input can be a left join result or a Table select"""
+        tables = {}
+
+        whereclause = base.whereclause
+
+        inner = base.get_final_froms()[0]
+        if isinstance(inner, Alias):
+            tables.update({inner.name: inner})
+            base = inner
+        elif isinstance(inner, Join):
+            tables.update(_get_tables(inner))
+            base = inner
+        else:
+            raise ShoudntHappenError(f"Unknown AGGREGATE input type: {type(base)}")
+
+        groupby_columns = []
+        for column in groupby:
+            groupby_columns.append((column.name, self.compile(column.expr, tables)))
+        aggregate_columns = []
+        for column in aggregate:
+            aggregate_columns.append((column.name, self.compile(column.expr, tables)))
+
+        select_columns = [*groupby_columns, *aggregate_columns]
+
+        result = select(
+            *(col.label(label) for label, col in select_columns)
+        ).select_from(base)
+        if whereclause is not None:
+            result = result.where(whereclause)
+        return result.group_by(*(col for _, col in groupby_columns))
+
+    def filter(self, base: Select, condition: Tree, subquery: bool = False) -> Select:
+        if subquery:
+            base = base.subquery()
+            tables = {None: base}
+        else:
+            tables = _get_tables(base)
+
+        clause = self.compile(condition, tables)
+
+        if subquery:
+            return base.select().where(clause)
+
+        return base.where(clause)
+
+    def calculate(self, base: Select, columns: List[Column]) -> Select:
+        selected_columns = []
+        tables = {None: base}
+        for column in columns:
+            selected_columns.append(
+                self.compile(expr=column.expr, tables=tables).label(column.name)
+            )
+        return base.with_only_columns(*selected_columns, maintain_column_froms=True)
+
+    def merge(self, bases: List[Select], on: List[str], left: bool = False):
+        """Merge multiple queries. Wrap each in subquery and then full outer join them.
+        The join condition is constructed by chaining the coalesced statements:
+
+        If A and B are dimension columns and x, y, z are measures:
+
+        SELECT coalesce(coalesce(t1.A, t2.A), t3.A) as A,
+            coalesce(coalesce(t1.b, t2.B), t3.B) as B,
+            t1.x, t2.y, t3.z
+        FROM (...) as t1
+        FULL OUTER JOIN (...) as t2
+            ON t1.A = t2.A
+            AND t1.B = t2.B
+        FULL OUTER JOIN (...) as t3
+            ON coalesce(t1.A, t2.A) = t3.A
+            AND coalesce(t1.B, t2.B) = t3.B
+
+        A left merge is the same, but with a left join
+        """
+        subqueries = [q.subquery() for q in bases]
+        joined, *joins = subqueries
+
+        coalesced = {k: v for k, v in joined.c.items() if k in on}
+
+        full = not left
+
+        for join in joins:
+            # join on columns that are common between merge_on, the table that's being
+            # joined and the merge_on columns that were present so far in the already
+            # joined tables
+            on = set(on) & set(coalesced) & set(join.c.keys())
+
+            # build the join condition
+            cond = (
+                and_(*(coalesced[c] == join.c[c] for c in on))
+                if len(on) > 0
+                else true()
+                # true() is when there's no merge_on
+                # or no common columns just cross join
+            )
+
+            # add the new join
+            joined = joined.outerjoin(join, cond, full=full)
+
+            # update the coalesced column list
+            for column in set(on) & set(join.c.keys()):
+                if column in coalesced:
+                    coalesced[column] = func.coalesce(coalesced[column], join.c[column])
+                else:
+                    coalesced[column] = join.c[column]
+
+        # at this point we just need to select the coalesced columns
+        columns = []
+        for k, v in coalesced.items():
+            columns.append(v.label(k))
+
+        # and any other columns that are not in the coalesced mapping
+        for s in subqueries:
+            columns.extend(c for c in s.c if c.name not in coalesced)
+
+        return select(*columns).select_from(joined)
+
+    def limit(self, base: Select, limit: int) -> Select:
+        return base.limit(limit)
+
+    def order_by(self, base: Select, items: List[LiteralOrderItem]) -> Select:
+        for item in items:
+            c = base.selected_columns[item.name]
+            if not item.ascending:
+                c = c.desc()
+            base = base.order_by(c)
+        return base

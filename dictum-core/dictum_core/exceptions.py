@@ -5,6 +5,10 @@ class DictumError(Exception):
     """Root exception class"""
 
 
+class ShoudntHappenError(DictumError):
+    """Errors that shouldn't happen. Mean there's a bug in the engine itself"""
+
+
 class LoadingError(DictumError):
     """Problems occurring when project YAML files are being loaded"""
 
@@ -210,6 +214,10 @@ class MissingTableTransformError(QueryError):
 
 class MissingTableTransformDimensionError(QueryError):
     """When transforms listed in of/within are not present in the query"""
+
+
+class MisusedTableTransformError(QueryError):
+    """Subj. e.g. when TOP is used in the select list or with scalars"""
 
 
 class ScalarTransformTypeError(QueryError):

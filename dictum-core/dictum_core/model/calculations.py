@@ -15,18 +15,11 @@ from dictum_core.model.types import Type
 from dictum_core.utils import value_to_token
 
 
-class ResolutionError(Exception):
-    pass
-
-
 @dataclass
 class Displayed:
-    id: str
     name: str
     description: str
-    type: Type
     format: Optional[Format]
-    missing: Optional[Any]
 
 
 @dataclass
@@ -41,10 +34,23 @@ class Expression:
     def expr(self) -> Tree:
         raise NotImplementedError
 
+    @property
+    def join_paths(self) -> List[str]:
+        result = []
+        for ref in self.expr.find_data("column"):
+            path = ref.children[1:-1]
+            if path:
+                result.append(path)
+        return result
 
-@dataclass
-class Calculation(Displayed, Expression):
+
+@dataclass(eq=False, repr=False)
+class Calculation:
     """Parent class for measures and dimensions."""
+
+    id: str
+    type: Type
+    missing: Optional[Any]
 
     @property
     def expr_tree(self) -> str:
@@ -58,26 +64,6 @@ class Calculation(Displayed, Expression):
             raise ValueError(
                 f"Error in {self} expression {self.str_expr}: {e}"
             ) from None
-
-    # def check_references(self, path=tuple()):
-    #     if self.id in path:
-    #         raise RecursionError(f"Circular reference in {self}: {path}")
-    #     self.check_measure_references(path + (self.id,))
-    #     self.check_dimension_references(path + (self.id,))
-
-    # def check_measure_references(self, path):
-    #     raise NotImplementedError
-
-    # def check_dimension_references(self, path):
-    #     for ref in self.parsed_expr.find_data("dimension"):
-    #         dimension = self.table.allowed_dimensions.get(ref.children[0])
-    #         if dimension is None:
-    #             raise KeyError(
-    #                 f"{self} uses dimension {ref.children[0]}, but there's "
-    #                 f"no unambiguous join path between {self.table} "
-    #                 "and dimension's parent table"
-    #             )
-    #         dimension.check_references(path)
 
     def prefixed_expr(self, prefix: List[str]) -> Tree:
         return utils.prefixed_expr(self.expr, prefix)
@@ -137,12 +123,11 @@ class DimensionTransformer(Transformer):
 
 
 @dataclass(eq=False, repr=False)
-class Dimension(TableCalculation):
+class Dimension(Displayed, TableCalculation, Expression):
     is_union: bool = False
 
     @property
     def expr(self) -> Tree:
-        # self.check_references()
         transformer = DimensionTransformer(
             self.table, self.table.measure_backlinks, self.table.allowed_dimensions
         )
@@ -162,14 +147,6 @@ class Dimension(TableCalculation):
                 ],
             )
         return expr
-
-    # def check_measure_references(self, path=tuple()):
-    #     for ref in self.parsed_expr.find_data("measure"):
-    #         measure_id = ref.children[0]
-    #         measure = self.table.measure_backlinks.get(measure_id).measures.get(
-    #             measure_id
-    #         )
-    #         measure.check_references(path)
 
     @property
     def transforms(self) -> Dict[str, ScalarTransformMeta]:
@@ -198,7 +175,7 @@ class TableFilter(Expression):
 
 
 @dataclass
-class DimensionsUnion(Displayed):
+class DimensionsUnion(Displayed, Calculation):
     def __str__(self):
         return f"Union({self.id})"
 
@@ -250,21 +227,14 @@ class MeasureFilter(Expression):
 
 
 @dataclass(repr=False)
-class Measure(TableCalculation):
+class Measure(TableCalculation, Expression):
     model: "dictum_core.model.Model"
     str_filter: Optional[str] = None
     str_time: Optional[str] = None
-
-    # def __post_init__(self):
-    #     if self.kind != "aggregate":
-    #         raise ValueError(
-    #             f"Measures must be aggregate, {self} expression is not:
-    # {self.str_expr}"
-    #         )
+    description: Optional[str] = None
 
     @property
     def expr(self) -> Tree:
-        # self.check_references()
         transformer = MeasureTransformer(
             self.table, self.table.measures, self.table.allowed_dimensions
         )
@@ -275,7 +245,6 @@ class Measure(TableCalculation):
         if self.str_filter is None:
             return None
         return MeasureFilter(measure=self, str_expr=self.str_filter)
-        # self.check_references()
 
     @property
     def time(self) -> Dimension:
@@ -292,11 +261,6 @@ class Measure(TableCalculation):
                     dimension = TimeDimension(locale=self.model.locale)
                     result[dimension.id] = dimension
         return result
-
-    # def check_measure_references(self, path=tuple()):
-    #     for ref in self.parsed_expr.find_data("measure"):
-    #         measure = self.table.measures.get(ref.children[0])
-    #         measure.check_references(path)
 
     def __eq__(self, other: "Metric"):
         return self.id == other.id
@@ -332,7 +296,7 @@ class MetricTransformer(Transformer):
 
 
 @dataclass(repr=False)
-class Metric(Calculation):
+class Metric(Displayed, Calculation, Expression):
     model: "dictum_core.model.Model"
     is_measure: bool = False
 
@@ -357,10 +321,7 @@ class Metric(Calculation):
         metrics = self.model.metrics.copy()
         del metrics[self.id]
         transformer = MetricTransformer(metrics, self.model.measures)
-        try:
-            expr = transformer.transform(self.parsed_expr)
-        except Exception as e:
-            raise ResolutionError(f"Error resolving expression of {self}: {e}")
+        expr = transformer.transform(self.parsed_expr)
         if self.missing is not None:
             expr = Tree(
                 "expr",
@@ -395,12 +356,12 @@ class Metric(Calculation):
 
     @property
     def dimensions(self) -> List[Dimension]:
-        return sorted(
-            set.intersection(
-                *(set(d for d in m.dimensions.values()) for m in self.measures)
-            ),
-            key=lambda x: x.name,
-        )
+        ids = set.intersection(*(set(d for d in m.dimensions) for m in self.measures))
+        return [
+            d
+            for d in self.model.dimensions.values()
+            if d.id in ids and not d.id.startswith("__")
+        ]
 
     @property
     def generic_time_dimensions(self) -> List[GenericTimeDimension]:

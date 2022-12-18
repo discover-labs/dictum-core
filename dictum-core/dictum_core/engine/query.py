@@ -120,12 +120,25 @@ ops = {
     "gt": ">",
     "ge": "<",
     "isnull": "is null",
-    "isnotnotnull": "is not null",
+    "isnotnull": "is not null",
 }
 
 
 class QueryMetric(QueryCalculation):
-    transforms: List[QueryTableTransform] = []
+    transform: Optional[QueryTableTransform] = None
+    transforms: List[QueryScalarTransform] = []
+
+    @property
+    def name(self) -> str:
+        suffixes = []
+        if self.transform is not None:
+            suffixes.append(self.transform.suffix)
+        for transform in self.transforms:
+            suffixes.append(transform.suffix)
+        if len(suffixes) > 0:
+            _suff = "_".join(suffixes)
+            return f"{self.id}__{_suff}"
+        return self.id
 
     # def render(self):
     #     """A special case, because no more than 2 are allowed."""
@@ -159,7 +172,8 @@ class Query(BaseModel):
     metrics: List[QueryMetricRequest] = []
     dimensions: List[QueryDimensionRequest] = []
     filters: List[QueryDimension] = []
-    limit: List[QueryMetric] = []
+    table_filters: List[QueryMetric] = []
+    limit: Optional[int] = None
 
     @property
     def digest(self) -> str:

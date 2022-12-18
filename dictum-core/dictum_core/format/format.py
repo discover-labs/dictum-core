@@ -9,7 +9,7 @@ from babel.numbers import format_currency, format_decimal, format_percent
 
 from dictum_core.format import d3
 from dictum_core.model.types import Type
-from dictum_core.schema.model.format import Format, FormatConfig
+from dictum_core.schema.model.calculations import Format, FormatConfig
 
 grain_skeletons = {
     "year": "y",
@@ -167,11 +167,16 @@ class Format:
         self.locale = locale
         self.type = type
         self.default_currency = default_currency
+        self._config = config
+
+    @property
+    def config(self) -> FormatConfig:
+        config = self._config
         if isinstance(config, str):
             config = FormatConfig(kind=config)
         if config is not None and config.kind == "currency" and config.currency is None:
-            config.currency = default_currency
-        self.config = config
+            config.currency = self.default_currency
+        return config
 
     @property
     def kind(self) -> BaseFormatKind:

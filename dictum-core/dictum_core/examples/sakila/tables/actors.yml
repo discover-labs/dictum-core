@@ -1,0 +1,7 @@
+source: actor
+primary_key: actor_id
+dimensions:
+  actor_roles:
+    name: Number of Actor's Roles
+    expr: $film_roles
+    type: int

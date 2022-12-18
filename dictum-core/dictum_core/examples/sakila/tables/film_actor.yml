@@ -1,0 +1,6 @@
+source: film_actor
+related:
+  actor:
+    table: actors
+    related_key: actor_id
+    foreign_key: actor_id

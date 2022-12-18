@@ -1,278 +1,331 @@
-import datetime
+from typing import Optional
 
 import pytest
-from pandas import DataFrame
-from pandas.api.types import is_datetime64_any_dtype
+from dateutil.parser import isoparse
+from lark import Tree
+from pandas import DataFrame, Timestamp, testing
 
 from dictum_core.backends.base import Backend
-from dictum_core.engine import Column, Engine, RelationalQuery
-from dictum_core.model import Model
-from dictum_core.model.expr.parser import parse_expr
-from dictum_core.schema import Query
+from dictum_core.engine.computation import Column, LiteralOrderItem
+from dictum_core.model.expr import parse_expr
+
+compiler_scalar_expr_test_cases = [
+    ("1.2", 1.2),
+    ("1", 1),
+    ("42", 42),
+    ("-1", -1),
+    ("-3.14", -3.14),
+    ("'abc'", "abc"),
+    ("''", ""),
+    ("true", True),
+    ("false", False),
+    ("@2022-01-01", Timestamp("2022-01-01")),
+    ("@2022-01-01T12:34:56", Timestamp("2022-01-01 12:34:56")),
+    ("media_types.MediaTypeId", 1),
+    ("2 ** 10", 1024),
+    ("-media_types.MediaTypeId", -5),
+    ("1 / 2", 0.5),
+    ("9 // 2", 4),
+    ("9 * 9", 81),
+    ("-9 * 9", -81),
+    ("9 % 2", 1),
+    ("66 + 11.4", 77.4),
+    ("77.4 - 11.4", 66),
+    ("media_types.MediaTypeId is null", False),
+    ("0 is null", False),
+    ("1 > 2", False),
+    ("2 > 1", True),
+    ("2 > 2", False),
+    ("1 >= 2", False),
+    ("2 >= 1", True),
+    ("2 >= 2", True),
+    ("1 < 2", True),
+    ("2 < 1", False),
+    ("2 < 2", False),
+    ("1 <= 2", True),
+    ("2 <= 1", False),
+    ("2 <= 2", True),
+    ("2 = 2", True),
+    ("1 = 2", False),
+    ("1 <> 2", True),
+    ("2 <> 2", False),
+    ("2 in (2, 3, 4)", True),
+    ("1 in (2, 3, 4)", False),
+    ("media_types.MediaTypeId in (1, 2, 3, 4, 5)", True),
+    ("media_types.MediaTypeId in (50)", False),
+    ("not true", False),
+    ("not false", True),
+    ("not 1 = 2", True),
+    ("not 2 = 2", False),
+    ("2 = 2 and 1 = 1", True),
+    ("2 = 2 and 1 = 2", False),
+    ("2 = 2 or 1 = 2", True),
+    ("2 = 1 or 2 = 2", True),
+    ("2 = 1 or 2 = 3", False),
+    ("case when 2 = 2 then 0 else 1 end", 0),
+    ("case when 2 = 1 then 1 when 3 = 1 then 1 else 0 end", 0),
+    ("case when 2 = 1 then 0 when 2 = 2 then 0 end", 0),
+    ("case when 2 = 1 then 1 end", None),
+    ("abs(-42) = abs(42)", True),
+    ("abs(-42)", 42),
+    ("abs(42)", 42),
+    ("floor(3.14)", 3),
+    ("floor(3.99)", 3),
+    ("floor(3)", 3),
+    ("floor(-3.14)", -4),
+    ("floor(0)", 0),
+    ("ceil(0)", 0),
+    ("ceil(3)", 3),
+    ("ceil(3.14)", 4),
+    ("ceil(3.99)", 4),
+    ("ceil(-3.14)", -3),
+    ("coalesce(null, 1)", 1),
+    ("coalesce(null, null, 1, 2)", 1),
+    ("coalesce(1, null, 2)", 1),
+    ("coalesce(null)", None),
+    ("coalesce(null, null, null, null)", None),
+    ("coalesce(5, media_types.MediaTypeId)", 5),
+    ("coalesce(media_types.MediaTypeId, 5)", 1),
+    ("tointeger(3.14)", 3),
+    ("tointeger(3)", 3),
+    ("tointeger(null)", None),
+    ("tointeger(-3.14)", -3),
+    ("tointeger('3')", 3),
+    ("tointeger('-3')", -3),
+    ("tofloat('3.14')", 3.14),
+    ("tofloat('-3.14')", -3.14),
+    ("tofloat(null)", None),
+    ("datepart('year', @2022-01-02)", 2022),
+    ("datepart('quarter', @2022-01-02)", 1),
+    ("datepart('month', @2022-01-02)", 1),
+    ("datepart('week', @2022-05-12)", 19),
+    ("datepart('day', @2022-01-02)", 2),
+    ("datepart('hour', @2022-01-02T12)", 12),
+    ("datepart('minute', @2022-01-02T12:34)", 34),
+    ("datepart('second', @2022-01-02T12:34:56)", 56),
+    ("datepart('dow', @2022-01-02T12:34:56)", 7),
+    ("datepart('dow', @2022-01-03T12:34:56)", 1),
+    ("datediff('year', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('quarter', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('month', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('week', @2022-01-02T23:59:59, @2022-01-03)", 1),
+    ("datediff('day', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('hour', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('minute', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('second', @2021-12-31T23:59:59, @2022-01-01)", 1),
+    ("datediff('year', @2021-01-01, @2021-12-31)", 0),
+    ("datediff('quarter', @2021-01-01, @2021-03-31)", 0),
+    ("datediff('month', @2021-01-01, @2021-01-31)", 0),
+    ("datediff('week', @2022-01-03, @2022-01-09)", 0),
+    ("datediff('day', @2021-12-31T00:00:00, @2021-12-31T23:59:59)", 0),
+    ("datediff('hour', @2021-12-31T23, @2021-12-31T23:59:59)", 0),
+    ("datediff('minute', @2021-12-31T04:59, @2021-12-31T04:59:59)", 0),
+    ("datediff('second', @2021-12-31T04:59:59, @2021-12-31T04:59:59.999)", 0),
+]
 
 
-@pytest.fixture(scope="module")
-def compute_df(engine: Engine, backend: Backend):
-    def compute(query: Query):
-        computation = engine.get_computation(query)
-        return DataFrame(computation.execute(backend).data)
-
-    return compute
-
-
-@pytest.fixture(scope="module")
-def compute_results(chinook: Model, engine: Engine, backend: Backend):
-    def compute(query: Query):
-        computation = engine.get_computation(query)
-        return computation.execute(backend).data
-
-    return compute
-
-
-def test_groupby(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "track_count"}}],
-            "dimensions": [{"dimension": {"id": "genre"}}],
-        }
+def get_compiler_scalar_expr(backend: Backend, expr: str):
+    table = backend.table("media_types", "media_types")
+    aggregate = backend.aggregate(
+        table, groupby=[Column(name="x", expr=parse_expr(expr))], aggregate=[]
     )
-    df = compute_df(query)
-    assert df[df["genre"] == "Rock"].iloc[0]["track_count"] == 1297
+    ordered = backend.order_by(aggregate, [LiteralOrderItem(name="x", ascending=True)])
+    df = backend.execute(ordered)
+    return df.iloc[0, 0]
 
 
-def test_filter(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "items_sold"}}],
-            "filters": [
-                {"id": "genre", "transforms": [{"id": "isin", "args": ["Rock"]}]},
-                {
-                    "id": "customer_country",
-                    "transforms": [{"id": "isin", "args": ["USA"]}],
-                },
-            ],
-        }
-    )
-    df = compute_df(query)
-    assert df.iloc[0][0] == 157
+@pytest.mark.parametrize(["expr", "expected"], compiler_scalar_expr_test_cases)
+def test_compiler_scalar_expr(backend: Backend, expr, expected):
+    result = get_compiler_scalar_expr(backend, expr)
+    assert result == expected
 
 
-@pytest.mark.skip
-def test_convert_datetime(chinook: Model, connection):
-    """Temporarily off, because not sure if this is needed. SQLite's datetime()
-    returns a string, not a datetime (unlike a raw column), but everything is sent
-    as a string to the frontend anyway. Only problem is the Python API, which we don't
-    have yet.
+compiler_scalar_expr_dates_test_cases = [
+    ("datetrunc('year', @2022-05-06)", isoparse("2022-01-01")),
+    ("datetrunc('quarter', @2022-05-06)", isoparse("2022-04-01")),
+    ("datetrunc('month', @2022-05-06)", isoparse("2022-05-01")),
+    ("datetrunc('week', @2022-05-06)", isoparse("2022-05-02")),
+    ("datetrunc('day', @2022-05-06T12)", isoparse("2022-05-06")),
+    ("datetrunc('hour', @2022-05-06T12:34)", isoparse("2022-05-06T12")),
+    ("datetrunc('minute', @2022-05-06T12:34:56)", isoparse("2022-05-06T12:34")),
+    ("datetrunc('second', @2022-05-06T12:34:56.789)", isoparse("2022-05-06T12:34:56")),
+    ("dateadd('year', 2, @2022-01-01)", isoparse("2024-01-01")),
+    ("dateadd('quarter', 2, @2022-01-01)", isoparse("2022-07-01")),
+    ("dateadd('month', 2, @2022-01-01)", isoparse("2022-03-01")),
+    ("dateadd('week', 2, @2022-01-01)", isoparse("2022-01-15")),
+    ("dateadd('day', 45, @2022-01-01)", isoparse("2022-02-15")),
+    ("dateadd('hour', 45, @2022-01-01)", isoparse("2022-01-02 21:00")),
+    ("dateadd('minute', 45, @2022-01-01)", isoparse("2022-01-01 00:45")),
+    ("dateadd('second', 45, @2022-01-01)", isoparse("2022-01-01 00:00:45")),
+]
+
+
+@pytest.mark.parametrize(["expr", "expected"], compiler_scalar_expr_dates_test_cases)
+def test_compiler_scalar_expr_dates(backend: Backend, expr: str, expected):
+    """For cases where the backend might return an unknown type, stringify the result
+    and compare
     """
-    q = Query(
-        metrics=["items_sold"],
-        dimensions=["invoice_date"],
-    )
-    comp = chinook.get_computation(q)
-    df = connection.compute(comp)
-    assert is_datetime64_any_dtype(df["invoice_date"].dtype)
+    result = get_compiler_scalar_expr(backend, expr)
+    assert isoparse(str(result)) == expected
 
 
-def test_metric_not_measure(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [
-                {"metric": {"id": "revenue"}},
-                {"metric": {"id": "track_count"}},
-                {"metric": {"id": "revenue_per_track"}},
-            ]
-        }
-    )
-    df = compute_df(query)
-    assert next(df.round(2).itertuples()) == (0, 2328.6, 3503, 0.66)
+compiler_aggregate_functions_test_cases = [
+    ("media_types", "sum(media_types.MediaTypeId)", 15),
+    ("media_types", "min(media_types.MediaTypeId)", 1),
+    ("media_types", "max(media_types.MediaTypeId)", 5),
+    ("media_types", "avg(media_types.MediaTypeId)", 3),
+    ("media_types", "count()", 5),
+    ("media_types", "count(media_types.MediaTypeId)", 5),
+    ("tracks", "countd(tracks.GenreId)", 25),
+]
 
 
-def test_metric_with_groupby(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "arppu"}}, {"metric": {"id": "track_count"}}],
-            "dimensions": [{"dimension": {"id": "genre"}}],
-        }
-    )
-    df = compute_df(query)
-    assert df.shape == (25, 3)
+@pytest.mark.parametrize(
+    ["table", "expr", "expected"], compiler_aggregate_functions_test_cases
+)
+def test_compiler_aggregate_functions(
+    backend: Backend, table: str, expr: str, expected
+):
+    table = backend.table(table, table)
+    col = Column(name="x", expr=parse_expr(expr))
+    aggregate = backend.aggregate(table, groupby=[], aggregate=[col])
+    df = backend.execute(aggregate)
+    assert df.iloc[0, 0] == expected
 
 
-def test_multiple_facts(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [
-                {"metric": {"id": "items_sold"}},
-                {"metric": {"id": "track_count"}},
-            ]
-        }
-    )
-    df = compute_df(query)
-    assert tuple(df.iloc[0]) == (2240, 3503)
+# call_window children are: fn_name, args (list), partition_by, order_by, window
+# window is always None, not supported yet
+
+_media_type_id = Tree("column", [None, "MediaTypeId"])
+_fdiv_3 = Tree("call", ["floor", Tree("div", [_media_type_id, 3])])
 
 
-def test_multiple_facts_dimensions(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [
-                {"metric": {"id": "items_sold"}},
-                {"metric": {"id": "track_count"}},
-            ],
-            "dimensions": [{"dimension": {"id": "genre"}}],
-        }
-    )
-    df = compute_df(query)
-    assert tuple(df[df["genre"] == "Rock"].iloc[0][["items_sold", "track_count"]]) == (
-        835,
-        1297,
-    )
-
-
-def test_if(compute_df: callable):
-    """Test if() function and case when ... then ... else ... end constructs"""
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "items_sold"}}],
-            "dimensions": [
-                {"dimension": {"id": "invoice_year"}},
-                {"dimension": {"id": "leap_year"}},
-            ],
-        }
-    )
-    df = compute_df(query)
-    assert df[df["leap_year"] == "Yes"].iloc[0]["invoice_year"] == 2012
-
-
-def test_subquery_join(compute_df: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "items_sold"}}],
-            "dimensions": [{"dimension": {"id": "customer_orders_amount_10_bins"}}],
-        }
-    )
-    df = compute_df(query)
-    assert df.shape == (2, 2)
-    assert df[df["customer_orders_amount_10_bins"] == 30].iloc[0].items_sold == 1708
-
-
-@pytest.fixture(scope="module")
-def compute(chinook: Model, backend: Backend):
-    def computer(expr: str, type="datetime"):
-        expr = parse_expr(expr)
-        columns = [Column(name="value", expr=expr, type=type)]
-        query = RelationalQuery(
-            source=chinook.tables.get("media_types"),
-            _groupby=columns,
-            join_tree=[],
+def _window_fn(
+    fn: str, args: list, partition_by: Optional[list], order_by: Optional[list]
+) -> Tree:
+    """Helper to build ASTs for window functions"""
+    _partition_by = None
+    _order_by = None
+    if partition_by:
+        _partition_by = Tree("partition_by", partition_by)
+    if order_by:
+        _order_by = Tree(
+            "order_by", [Tree("order_by_item", [a, b]) for a, b in order_by]
         )
-        compiled = backend.compile_query(query)
-        return str(backend.execute(compiled).iloc[0, 0])
-
-    return computer
-
-
-def test_datetrunc(compute):
-    dt = "2021-12-19 14:05:38"
-
-    def datetrunc(part: str):
-        return compute(f"datetrunc('{part}', toDatetime('{dt}'))")
-
-    assert datetrunc("year") == "2021-01-01 00:00:00"
-    assert datetrunc("quarter") == "2021-10-01 00:00:00"
-    assert datetrunc("month") == "2021-12-01 00:00:00"
-    assert datetrunc("week") == "2021-12-13 00:00:00"
-    assert (
-        compute("datetrunc('week', toDatetime('2022-01-03'))") == "2022-01-03 00:00:00"
+    return Tree(
+        "expr",
+        [
+            Tree(
+                "call_window",
+                [
+                    fn,
+                    *args,
+                    _partition_by,
+                    _order_by,
+                    None,
+                ],
+            )
+        ],
     )
-    assert datetrunc("day") == "2021-12-19 00:00:00"
-    assert datetrunc("hour") == "2021-12-19 14:00:00"
-    assert datetrunc("minute") == "2021-12-19 14:05:00"
-    assert datetrunc("second") == "2021-12-19 14:05:38"
 
 
-def test_datepart(compute):
-    """ISO states that the first week of the year is the week that contains the first
-    Thursday of the year, or the week that contains January 4th. Not all database
-    engines conform to this and it would be very tedious to implement that on the
-    backend level, so we don't test for the edge cases (start and end of year) here.
-    Just use whatever logic the RDBMS provides.
-    """
-    dt = "2021-12-19 14:05:38"
-
-    def datepart(part: str):
-        return int(compute(f"datepart('{part}', toDatetime('{dt}'))", type="int"))
-
-    assert datepart("year") == 2021
-    assert datepart("quarter") == 4
-    assert compute("datepart('quarter', toDatetime('2021-12-31'))", "int") == "4"
-    assert compute("datepart('quarter', toDatetime('2022-01-01'))", "int") == "1"
-    assert datepart("month") == 12
-    assert datepart("week") == 50
-    assert datepart("day") == 19
-    assert datepart("hour") == 14
-    assert datepart("minute") == 5
-    assert datepart("second") == 38
-
-    # Monday is 1, Sunday is 7
-    assert datepart("dow") == 7
-    assert datepart("dayofweek") == 7
-    assert compute("datepart('dow', toDatetime('2022-08-08'))", "int") == "1"
-    assert compute("datepart('dayofweek', toDatetime('2022-08-08'))", "int") == "1"
-
-
-def test_datediff(compute):
-    def datediff(part, s, e):
-        return int(
-            compute(f"datediff('{part}', toDatetime('{s}'), toDatetime('{e}'))", "int")
-        )
-
-    assert datediff("year", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("quarter", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("month", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("week", "2022-01-02 23:59:59", "2022-01-03 00:00:00") == 1
-    assert datediff("day", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("hour", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("minute", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-    assert datediff("second", "2021-12-31 23:59:59", "2022-01-01 00:00:00") == 1
-
-    assert datediff("year", "2021-01-01", "2021-12-31") == 0
-    assert datediff("quarter", "2021-01-01", "2021-03-31") == 0
-    assert datediff("month", "2021-01-01", "2021-01-31") == 0
-    assert datediff("week", "2022-01-03", "2022-01-09") == 0
-    assert datediff("day", "2021-12-31 00:00:00", "2021-12-31 23:59:59") == 0
-    assert datediff("hour", "2021-12-31 04:00:00", "2021-12-31 04:59:59") == 0
-    assert datediff("minute", "2021-12-31 04:59:00", "2021-12-31 04:59:59") == 0
-    assert datediff("second", "2021-12-31 04:59:59", "2021-12-31 04:59:59") == 0
+compiler_window_functions_test_cases = [
+    (
+        _window_fn("row_number", [], None, [(_media_type_id, True)]),
+        [1, 2, 3, 4, 5],
+        "row_number() over (order by MediaTypeId asc)",
+    ),
+    (
+        _window_fn("row_number", [], [_media_type_id], None),
+        [1, 1, 1, 1, 1],
+        "row_number() over (partition by MediaTypeId)",
+    ),
+    (
+        _window_fn("row_number", [], None, [(_media_type_id, False)]),
+        [5, 4, 3, 2, 1],
+        "row_number() over (order by MediaTypeId desc)",
+    ),
+    (
+        _window_fn("row_number", [], [_fdiv_3], [(_media_type_id, True)]),
+        [1, 2, 1, 2, 3],
+        "row_number() over (partition by MediaTypeId // 3 order by MediaTypeId)",
+    ),
+    (
+        _window_fn("row_number", [], [_fdiv_3], [(_media_type_id, False)]),
+        [2, 1, 3, 2, 1],
+        "row_number() over (partition by MediaTypeId // 3 order by MediaTypeId desc)",
+    ),
+    (
+        _window_fn("sum", [_media_type_id], None, None),
+        [15, 15, 15, 15, 15],
+        "sum(MediaTypeId) over ()",
+    ),
+    (
+        _window_fn("sum", [_media_type_id], [_fdiv_3], None),
+        [3, 3, 12, 12, 12],
+        "sum(MediaTypeId) over (partition by MediaTypeId // 3)",
+    ),
+    (
+        _window_fn("sum", [_media_type_id], [_fdiv_3], [(_media_type_id, True)]),
+        [1, 3, 3, 7, 12],
+        "sum(MediaTypeId) over (partition by MediaTypeId // 3 order by MediaTypeId)",
+    ),
+    (
+        _window_fn("sum", [_media_type_id], [_fdiv_3], [(_media_type_id, False)]),
+        [3, 2, 12, 9, 5],
+        (
+            "sum(MediaTypeId) over "
+            "(partition by MediaTypeId // 3 order by MediaTypeId desc)"
+        ),
+    ),
+]
 
 
-def test_date(compute_results: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "revenue"}}],
-            "dimensions": [{"dimension": {"id": "invoice_date"}}],
-        }
-    )
-    results = compute_results(query)
-    assert isinstance(results, list)
-    assert isinstance(results[0], dict)
-    assert isinstance(results[0]["invoice_date"], datetime.date)
+@pytest.mark.parametrize(
+    ["expr", "expected", "comment"], compiler_window_functions_test_cases
+)
+def test_compiler_window_functions(
+    backend: Backend, expr: Tree, expected, comment: str
+):
+    comment
+    table = backend.table("media_types", "media_types")
+    id_ = Column(name="id", expr=Tree("expr", [Tree("column", [None, "MediaTypeId"])]))
+    x = Column(name="x", expr=expr)
+    calculate = backend.calculate(table, [id_, x])
+    query = backend.order_by(calculate, [LiteralOrderItem(name="id", ascending=True)])
+    df = backend.execute(query)
+    expected_df = DataFrame({"id": [1, 2, 3, 4, 5], "x": expected})
+    assert df.shape[0] == 5
+    testing.assert_frame_equal(df, expected_df)
 
 
-def test_datetime(compute_results: callable):
-    query = Query.parse_obj(
-        {
-            "metrics": [{"metric": {"id": "revenue"}}],
-            "dimensions": [{"dimension": {"id": "invoice_datetime"}}],
-        }
-    )
-    results = compute_results(query)
-    assert isinstance(results, list)
-    assert isinstance(results[0], dict)
-    assert isinstance(results[0]["invoice_datetime"], datetime.datetime)
+def test_backend_full_merge(backend: Backend):
+    t1 = backend.table("media_types", "t1")
+    t1 = backend.filter(t1, parse_expr("t1.MediaTypeId in (1, 2, 3)"))
+
+    t2 = backend.table("media_types", "t2")
+    t2 = backend.filter(t2, parse_expr("t2.MediaTypeId in (3, 4, 5)"))
+
+    merged = backend.merge([t1, t2], on=["MediaTypeId"])
+    df = backend.execute(merged)
+
+    assert df.shape == (5, 3)
+    assert df["MediaTypeId"].to_list() == [1, 2, 3, 4, 5]
+    assert df.iloc[:, 1].dropna().size == 3
+    assert df.iloc[:, 2].dropna().size == 3
 
 
-def test_division(compute_results: callable):
-    """Test division semantics with an integer."""
-    query = Query.parse_obj({"metrics": [{"metric": {"id": "pct_music_orders"}}]})
-    results = compute_results(query)
-    assert round(results[0]["pct_music_orders"], 2) == 0.95
+def test_backend_left_merge(backend: Backend):
+    t1 = backend.table("media_types", "t1")
+    t1 = backend.filter(t1, parse_expr("t1.MediaTypeId in (1, 2, 3)"))
+
+    t2 = backend.table("media_types", "t2")
+    t2 = backend.filter(t2, parse_expr("t2.MediaTypeId in (3, 4, 5)"))
+
+    merged = backend.merge([t1, t2], on=["MediaTypeId"], left=True)
+    df = backend.execute(merged)
+
+    assert df.shape == (3, 3)
+    assert df["MediaTypeId"].to_list() == [1, 2, 3]
+    assert df.iloc[:, 1].dropna().size == 3
+    assert df.iloc[:, 2].dropna().size == 1

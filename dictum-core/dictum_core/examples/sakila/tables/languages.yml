@@ -1,0 +1,8 @@
+source: language
+primary_key: language_id
+dimensions:
+  language:
+    name: Language
+    expr: name
+    type: str
+    missing: N/A

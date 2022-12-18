@@ -1,4 +1,5 @@
-from dictum_core.schema.query import (
+from dictum_core.engine.query import (
+    Query,
     QueryDimension,
     QueryDimensionRequest,
     QueryMetric,
@@ -33,19 +34,17 @@ def test_calculation_name():
     assert (
         QueryMetric(
             id="x",
-            transforms=[
-                QueryTableTransform(
-                    id="y",
-                    args=[1],
-                    of=[QueryDimension(id="a")],
-                    within=[
-                        QueryDimension(
-                            id="b",
-                            transforms=[QueryScalarTransform(id="s", args=["ab"])],
-                        )
-                    ],
-                )
-            ],
+            transform=QueryTableTransform(
+                id="y",
+                args=[1],
+                of=[QueryDimension(id="a")],
+                within=[
+                    QueryDimension(
+                        id="b",
+                        transforms=[QueryScalarTransform(id="s", args=["ab"])],
+                    )
+                ],
+            ),
         ).name
         == "x__y_1_of_a_within_b__s_ab"
     )
@@ -116,4 +115,14 @@ def test_render_query_metric():
             {"id": "test", "transforms": [{"id": "x"}, {"id": "gt", "args": [1]}]}
         ).render()
         == "test.x().gt(1)"
+    )
+
+
+def test_int_limit():
+    Query.parse_obj(
+        {
+            "metrics": [{"metric": {"id": "test"}}],
+            "dimensions": [{"dimension": {"id": "test"}}],
+            "limit": 5,
+        }
     )

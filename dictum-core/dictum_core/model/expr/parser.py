@@ -12,6 +12,9 @@ class Preprocessor(Transformer):
         """Unquotes string values (by default they are captured with '')"""
         return Token("STRING", token.value[1:-1])
 
+    def DATETIME(self, token: Token):
+        return Token("DATETIME", token.value.lstrip("@"))
+
     def IDENTIFIER(self, token: Token):
         return token.value
 

@@ -1,0 +1,4 @@
+name: Users
+expr: count()
+time: user_creation_date
+table: users

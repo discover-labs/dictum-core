@@ -2,6 +2,7 @@
 
 %import common.SIGNED_FLOAT  -> FLOAT
 %import common.SIGNED_INT    -> INTEGER
+%import common.INT           -> UINTEGER
 %import common._STRING_ESC_INNER
 STRING: "'" _STRING_ESC_INNER "'"
 TRUE: "TRUE"i
@@ -16,7 +17,8 @@ identifier: IDENTIFIER | QUOTED_IDENTIFIER
 _SELECT: "SELECT"i
 _WHERE: "WHERE"i
 _GROUPBY: /(GROUP\s+)?BY/i
-_LIMIT: /LIMIT/i
+_HAVING: "HAVING"i
+_LIMIT: "LIMIT"i
 _AS: "AS"i
 _IS: "IS"i
 _NOT: "NOT"i
@@ -27,34 +29,43 @@ _WITHIN: "WITHIN"i
 
 alias: _AS identifier
 
-scalar_transform: identifier [ "(" [ literal ( "," literal )* ] ")" ]
-table_transform: identifier [ "(" [ literal ( "," literal )* ] ")" ] [ of ] [ within ]
+_args: "(" [ literal ( "," literal )* ] ")"
+scalar_transform: identifier _args?
+table_transform: identifier _args? [ of ] [ within ]
 
-metric: identifier [ "." table_transform ] [ op ]
+metric: identifier [ "." table_transform ]
 metric_request: metric [ alias ]
 of: _OF "(" dimension ( "," dimension )* ")"
 within: _WITHIN "(" dimension ( "," dimension )* ")"
 
-dimension: identifier ( "." scalar_transform )* [ op ]
+dimension: identifier ( "." scalar_transform )*
 dimension_request: dimension [ alias ]
 
-op: eq | ne | gt | ge | lt | le | isnull | isnotnull | isin
-eq: ("=" | "==") literal
-ne: ("!=" | "<>") literal
-gt: ">" literal
-ge: ">=" literal
-lt: "<" literal
-le: "<=" literal
-isnull: _IS _NULL
-isnotnull: _IS _NOT _NULL
-isin: _IN _tuple
+eq{c}: c "=" literal
+ne{c}: c ( "<>" | "!=" ) literal
+gt{c}: c ">" literal
+ge{c}: c ">=" literal
+lt{c}: c "<" literal
+le{c}: c "<=" literal
+isnull{c}: c _IS _NULL
+isnotnull{c}: c _IS _NOT _NULL
+isin{c}: c _IN _tuple
 _tuple: "(" literal ("," literal)* ")"
 
+_expr{c}: eq{c} | ne{c} | gt{c} | ge{c} | lt{c} | le{c} | isnull{c} | isnotnull{c} | isin{c} | c
+
+?dimension_expr: _expr{dimension}
+?metric_expr: _expr{metric}
+
 select: _SELECT metric_request ( "," metric_request )*
-where: _WHERE dimension ( "," dimension )*
+where: _WHERE dimension_expr ( "," dimension_expr )*
+having: _HAVING metric_expr ( "," metric_expr )*
 groupby: _GROUPBY dimension_request ( "," dimension_request )*
-limit: _LIMIT metric ( "," metric )*
+limit: _LIMIT UINTEGER
 
-query: select [ where ] [ groupby [ limit ] ]
+query: select where? [ groupby having? ] limit?
 
+COMMENT: /--.*/
+
+%ignore COMMENT
 %ignore /\s/

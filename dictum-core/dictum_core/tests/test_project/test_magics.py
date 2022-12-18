@@ -8,7 +8,6 @@ from dictum_core.exceptions import ShorthandSyntaxError
 from dictum_core.project.magics.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
     parse_shorthand_dimension,
-    parse_shorthand_format,
     parse_shorthand_metric,
     parse_shorthand_table,
 )
@@ -98,16 +97,6 @@ def test_parse_table_with_related():
     assert related.data == "related"
 
 
-def test_parse_format_str():
-    result = parse_shorthand_format("currency")
-    assert result == Tree("format", ["currency"])
-
-
-def test_parse_format_kv():
-    result = parse_shorthand_format("kind=currency currency=USD")
-    assert result == Tree("format", [("kind", "currency"), ("currency", "USD")])
-
-
 def test_standalone_table(tmp_path: Path, project):
     project = Project.new(backend=project.backend, path=tmp_path)
     magics = ProjectMagics(project)
@@ -116,7 +105,7 @@ def test_standalone_table(tmp_path: Path, project):
 
 @pytest.fixture(scope="function")
 def empty():
-    return Project.example("empty")
+    return Project.example("chinook", empty=True)
 
 
 def test_project_create_table(empty: Project):
@@ -188,3 +177,48 @@ def test_project_create_from_scratch_write(tmp_path: Path, project: Project):
     project.write()
     arppu = yaml.safe_load((tmp_path / "metrics" / "arppu.yml").read_text())
     assert arppu["name"] == "Average Revenue per Paying User"
+
+
+def test_update_shorthand_union(empty: Project):
+    empty.update_shorthand_union("country ::str")
+
+    assert "country" in empty.model.dimensions
+
+
+def test_update_shorthand_union_named(empty: Project):
+    empty.update_shorthand_union('country ::str as "Ctry"')
+
+    assert "country" in empty.model.dimensions
+    assert empty.model.dimensions["country"].name == "Ctry"
+
+
+def test_missing_integer(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_metric(
+        "invoice_items.revenue = sum(Quantity * UnitPrice) { missing=0 }"
+    )
+
+    assert isinstance(empty.model.metrics["revenue"].missing, int)
+    assert empty.model.metrics["revenue"].missing == 0
+
+
+def test_missing_float(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_metric(
+        "invoice_items.revenue = sum(Quantity * UnitPrice) { missing=0.0 }"
+    )
+
+    assert isinstance(empty.model.metrics["revenue"].missing, float)
+    assert empty.model.metrics["revenue"].missing == 0.0
+
+
+def test_create_measure(empty: Project):
+    empty.update_shorthand_table("invoice_items")
+    empty.update_shorthand_measure("invoice_items.xxx = sum(aaa)")
+
+    assert "xxx" in empty.model.measures
+
+
+def test_create_table_measure(empty: Project):
+    empty.update_shorthand_table("invoice_items measure xxx = sum(aaa)")
+    assert "xxx" in empty.model.measures

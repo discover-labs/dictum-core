@@ -3,6 +3,7 @@ description: |
   Revenue, but only for music files. Used for demonstrating
   filtered measures.
 expr: $revenue
+missing: 0
 table: invoice_items
 filter: track.MediaTypeId in (1, 2, 4, 5)
 format: currency

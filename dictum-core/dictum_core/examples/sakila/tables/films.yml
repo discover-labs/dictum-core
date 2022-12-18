@@ -1,0 +1,17 @@
+source: film
+primary_key: film_id
+related:
+  language:
+    table: languages
+    related_key: null
+    foreign_key: language_id
+dimensions:
+  film_release_year:
+    name: Film Release Year
+    expr: release_year
+    type: int
+  film_cast_size:
+    name: Film' Cast Size
+    description: Number of actors who played a role in a particular film
+    expr: $film_roles
+    type: int

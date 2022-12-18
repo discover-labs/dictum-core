@@ -84,6 +84,7 @@ known_functions = {
     "datediff",
     "datepart",
     "datetrunc",
+    "dateadd",
     "IF",
 }
 
@@ -243,11 +244,16 @@ def _check_measures_dont_reference_filtered_measures(model: Model):
 @check_model.depends_on(
     _check_expr_parse, _check_known_calculations, _check_calculation_kinds
 )
-def _check_aggregate_dimension_table_has_pk(model: Model):
+def _check_aggregate_dimensions(model: Model):
     for dimension in model.dimensions.values():
         if not isinstance(dimension, Expression):
             continue
-        for _ in dimension.parsed_expr.find_data("measure"):
+        for ref in dimension.parsed_expr.find_data("measure"):
+            if ref.children[0] not in model.measures:
+                raise MissingMeasureError(
+                    f"{dimension} references a metric ${ref.children[0]}, "
+                    "only measures can be used in aggregate dimensions"
+                )
             if dimension.table.primary_key is None:
                 raise MissingPrimaryKeyError(
                     f"{dimension} is aggregate, so its' parent {dimension.table} "

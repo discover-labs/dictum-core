@@ -1,0 +1,4 @@
+name: Number of Film Roles
+description: Number of times an actor played a role in a film.
+expr: count()
+table: film_actor

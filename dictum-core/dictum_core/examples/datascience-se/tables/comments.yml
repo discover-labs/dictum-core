@@ -1,0 +1,16 @@
+source: comments
+primary_key: id
+related:
+  author:
+    table: users
+    related_key: null
+    foreign_key: userid
+  post:
+    table: posts
+    related_key: null
+    foreign_key: postid
+dimensions:
+  comment_creation_date:
+    name: Comment Creation Date
+    expr: creationdate
+    type: datetime

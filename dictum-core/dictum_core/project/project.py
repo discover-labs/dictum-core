@@ -1,4 +1,4 @@
-import importlib
+from copy import deepcopy
 from pathlib import Path
 from typing import Optional, Union
 
@@ -6,9 +6,10 @@ import altair as alt
 import pandas as pd
 from lark import Tree
 
-from dictum_core import schema
+from dictum_core import examples, schema
 from dictum_core.backends.base import Backend
 from dictum_core.engine import Engine, Result
+from dictum_core.engine.graph.operators import Operator
 from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
@@ -17,10 +18,10 @@ from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
     parse_shorthand_dimension,
-    parse_shorthand_format,
     parse_shorthand_metric,
     parse_shorthand_related,
     parse_shorthand_table,
+    parse_shorthand_union,
 )
 from dictum_core.project.templates import environment
 from dictum_core.project.yaml_mapped_dict import YAMLMappedDict
@@ -70,6 +71,7 @@ class Project:
         self.backend = backend
 
         self.model_data = model_data
+        self.staged_model_data = deepcopy(model_data)
         model_config = schema.Model.parse_obj(model_data)
 
         self.model = Model.from_config(model_config)
@@ -78,8 +80,6 @@ class Project:
         self.metrics = ProjectMetrics(self)
         self.dimensions = ProjectDimensions(self)
         self.m, self.d = self.metrics, self.dimensions
-
-        self.latest_calc = None
 
         if self.model.theme is not None:
             alt.themes.register("dictum_theme", lambda: self.model.theme)
@@ -135,9 +135,6 @@ class Project:
         model_data["locale"] = project_config.locale
         model_data["currency"] = project_config.currency
 
-        tables_path = path / project_config.tables_path
-        if not tables_path.is_dir():
-            raise MissingPathError(path)
         model_data["tables"] = YAMLMappedDict.from_path(
             path / project_config.tables_path
         )
@@ -155,13 +152,15 @@ class Project:
             model_data=model_data, backend=backend, project_config=project_config
         )
 
+    def get_computation(self, query: Query):
+        return self.engine.get_computation(query)
+
     def execute(self, query: Query) -> Result:
-        computation = self.engine.get_computation(query)
+        computation = self.get_computation(query)
         return computation.execute(self.backend)
 
-    def query_graph(self, query: Query):
-        computation = self.engine.get_computation(query)
-        return computation.graph(self.backend)
+    def query_graph(self, query: Query) -> Operator:
+        return self.engine.get_computation(query)
 
     def ql(self, query: str) -> analyses.QlQuery:
         return analyses.QlQuery(self, query)
@@ -196,26 +195,41 @@ class Project:
         return ProjectChart(self)
 
     @classmethod
-    def example(cls, name: str) -> "Project":
+    def example(cls, name: str, empty: bool = False) -> "Project":
         """Load an example project.
 
         Arguments:
             name (str):
                 Name of the example project. Valid values: ``chinook``,
                 ``empty``.
+            empty (bool):
+                If True, the model will be empty.
+                Defaults to False.
+
 
         Returns:
             CachedProject: same as ``Project``, but won't read the model config at each
             method invocation.
         """
-        example = importlib.import_module(f"dictum_core.examples.{name}.generate")
-        result: Project = example.generate()
+        path = Path(examples.__file__).parent / name
+        if not path.is_dir():
+            raise FileNotFoundError(f"Example project {name} does not exist")
+        result = Project.from_path(path)
         # prevent users from changing examples
         result.project_config.root = None
-        result.model_data = YAMLMappedDict(result.model_data.dict())
+        if empty:  # initialize an empty model
+            model_data = schema.Model(
+                name=result.project_config.name,
+                locale=result.project_config.locale,
+                currency=result.project_config.currency,
+            ).dict()
+            result.staged_model_data = YAMLMappedDict(model_data)
+        else:  # remove all paths to avoid overwriting by user
+            result.staged_model_data = YAMLMappedDict(result.model_data.dict())
+        result.commit_model_data()
         return result
 
-    def describe(self) -> pd.DataFrame:
+    def describe(self) -> alt.Chart:
         """Show project's metrics and dimensions and their compatibility. If a metric
         can be used with a dimension, there will be a ``+`` sign at the intersection of
         their respective row and column.
@@ -231,11 +245,43 @@ class Project:
         data = []
         for metric in self.model.metrics.values():
             for dimension in metric.dimensions:
-                data.append((metric.id, dimension.id, "✚"))
+                row = dict(
+                    metric=metric.id,
+                    metric_name=metric.name,
+                    dimension=dimension.id,
+                    dimension_name=dimension.name,
+                )
+                row["dimension_table"] = ""
+                if hasattr(dimension, "table"):
+                    row["dimension_table"] = dimension.table.id
+                data.append(row)
+        df = pd.DataFrame(data)
         return (
-            pd.DataFrame(data=data, columns=["metric", "dimension", "check"])
-            .pivot(index="dimension", columns="metric", values="check")
-            .fillna("")
+            alt.Chart(df)
+            .mark_rect(stroke="white")
+            .encode(
+                x=alt.X(
+                    "metric:N",
+                    axis=alt.Axis(title="Metrics", orient="top", labelAngle=-45),
+                ),
+                y=alt.Y("dimension:N", axis=alt.Axis(title="Dimensions")),
+                tooltip=[
+                    {"title": "Metric ID", "field": "metric", "type": "nominal"},
+                    {"title": "Metric Name", "field": "metric_name", "type": "nominal"},
+                    {"title": "Dimension ID", "field": "dimension", "type": "nominal"},
+                    {
+                        "title": "Dimension Name",
+                        "field": "dimension_name",
+                        "type": "nominal",
+                    },
+                    {
+                        "title": "Dimension Table",
+                        "field": "dimension_table",
+                        "type": "nominal",
+                    },
+                ],
+            )
+            .properties(width=alt.Step(15), height=alt.Step(15))
         )
 
     def magic(self):
@@ -263,30 +309,38 @@ class Project:
             source = source.children[0]
         if source is None:
             source = table
-        data = {"id": table, "source": source}
+        data = {"source": source}
 
         pk = next(table_def.find_data("pk"), None)
         if pk is not None:
             data["primary_key"] = pk.children[0]
-        self.update_model({"tables": {table: data}})
+        self.stage_model_data({"tables": {table: data}})
 
         # add items
         for item in items:
             if item.data == "related":
                 str_shorthand = _get_subtree_str(definition, item)
-                self.update_shorthand_related(f"{table}.{str_shorthand}")
+                self.update_shorthand_related(f"{table}.{str_shorthand}", commit=False)
             elif item.data == "dimension":
                 self.update_shorthand_dimension(
-                    _get_subtree_str(definition, item), table
+                    _get_subtree_str(definition, item), table, commit=False
                 )
             elif item.data == "metric":
-                self.update_shorthand_metric(_get_subtree_str(definition, item), table)
+                self.update_shorthand_metric(
+                    _get_subtree_str(definition, item), table, commit=False
+                )
+            elif item.data == "measure":
+                self.update_shorthand_measure(
+                    _get_subtree_str(definition, item), table, commit=False
+                )
             elif item.data == "table_format":
                 self.update_shorthand_format(
                     _get_subtree_str(definition, item.children[0])
                 )
 
-    def update_shorthand_related(self, definition: str):
+        self.commit_model_data()
+
+    def update_shorthand_related(self, definition: str, commit: bool = True):
         tree = parse_shorthand_related(definition)
         tables = tree.find_data("table")
         parent = next(tables).children[0]
@@ -317,17 +371,39 @@ class Project:
                 }
             }
         }
-        self.update_model(update)
+        self.stage_model_data(update)
+        if commit:
+            self.commit_model_data()
 
-    def update_shorthand_metric(self, definition: str, table: Optional[str] = None):
+    def update_shorthand_metric(
+        self, definition: str, table: Optional[str] = None, commit: bool = True
+    ):
         tree = parse_shorthand_metric(definition)
         id_, kwargs = _get_calculation_kwargs(definition, tree)
-        kwargs["table"] = kwargs.get("table", table)
+        table = kwargs.get("table", table)
+        if table is not None:
+            kwargs["table"] = table
         update = {"metrics": {id_: kwargs}}
-        self.update_model(update)
-        self.latest_calc = self.model_data["metrics"][id_]
+        self.stage_model_data(update)
+        if commit:
+            self.commit_model_data()
 
-    def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
+    def update_shorthand_measure(
+        self, definition: str, table: Optional[str] = None, commit: bool = True
+    ):
+        tree = parse_shorthand_metric(definition)
+        id_, kwargs = _get_calculation_kwargs(definition, tree)
+        table = kwargs.get("table", table)
+        if table is None:
+            raise ValueError("Measure requires a table")
+        update = {"tables": {table: {"measures": {id_: kwargs}}}}
+        self.stage_model_data(update)
+        if commit:
+            self.commit_model_data()
+
+    def update_shorthand_dimension(
+        self, definition: str, table: Optional[str] = None, commit: bool = True
+    ):
         tree = parse_shorthand_dimension(definition)
         id_, kwargs = _get_calculation_kwargs(definition, tree)
         schema.Dimension.parse_obj(kwargs)  # validate before updating
@@ -336,29 +412,38 @@ class Project:
         if table is None:
             raise ValueError("Table is required, please specify with '@ table'")
         update = {"tables": {table: {"dimensions": {id_: kwargs}}}}
-        self.update_model(update)
+        self.stage_model_data(update)
+        if commit:
+            self.commit_model_data()
 
-        self.latest_calc = self.model_data["tables"][table]["dimensions"][id_]
-
-    def update_shorthand_format(self, definition: str):
-        format = parse_shorthand_format(definition)
-        if isinstance(format.children[0], str):
-            format = format.children[0]
+    def update_shorthand_union(self, definition: str):
+        tree = parse_shorthand_union(definition)
+        id_, type_, *_ = tree.children
+        type_ = type_.children[0]
+        name = next(tree.find_data("alias"), None)
+        if name is not None:
+            name = name.children[0]
         else:
-            format = dict(format.children)
-        update = {"format": format}
-        self.latest_calc.update_recursive(update)
-        self.update_model({})  # trigger model update
+            name = id_.replace("_", " ").title()
+        update = {"unions": {id_: {"type": type_, "name": name}}}
+        self.stage_model_data(update)
+        self.commit_model_data()
 
-    def update_model(self, update: dict):
-        # avoid updating model_data until model is checked
-        new = self.model_data.copy()
-        new.update_recursive(update)
+    def stage_model_data(self, update: dict):
+        # avoid updating model_data until the staged model is checked
+        self.staged_model_data.update_recursive(update)
 
-        model_config = schema.Model.parse_obj(new)
-        self.model = Model.from_config(model_config)  # model checks happen here
+    def commit_model_data(self):
+        try:
+            model_config = schema.Model.parse_obj(self.staged_model_data)
+            self.model = Model.from_config(model_config)  # model checks happen here
+        except Exception:
+            # staged model data is invalid, rollback an re-raise
+            self.staged_model_data = deepcopy(self.model_data)
+            raise
+
         # we're ok, can update model data
-        self.model_data = new
+        self.model_data = deepcopy(self.staged_model_data)
 
         # do the rest of the stuff
         self.engine = Engine(self.model)
@@ -378,7 +463,7 @@ class Project:
             self.project_config.root = path
         path = self.project_config.root
 
-        if not path.exists():
+        if not path.exists() or not (path / "project.yml").exists():
             actions.create_new_project(
                 path,
                 backend=self.backend,

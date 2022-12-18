@@ -1,0 +1,3 @@
+name: Comments Per Post
+expr: $comments / $posts
+table: null
