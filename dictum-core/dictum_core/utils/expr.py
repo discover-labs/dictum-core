@@ -1,5 +1,5 @@
 import dataclasses
-from datetime import date, datetime
+from datetime import datetime
 
 from lark import Token, Tree
 

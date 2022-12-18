@@ -27,3 +27,9 @@ class Column:
             if path:
                 result.append(path)
         return result
+
+
+@dataclass
+class LiteralOrderItem:
+    name: str
+    ascending: bool

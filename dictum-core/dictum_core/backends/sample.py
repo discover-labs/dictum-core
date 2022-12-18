@@ -2,7 +2,6 @@ from functools import cached_property
 from pathlib import Path
 
 import requests
-from sqlalchemy import create_engine
 from sqlalchemy.engine import Engine
 
 from dictum_core.backends.sqlite import SQLiteBackend
@@ -47,7 +46,7 @@ class SampleBackend(SQLiteBackend):
 
     @cached_property
     def engine(self) -> Engine:
-        engine = create_engine(self.url)
+        engine = super().engine
         with engine.connect() as conn:
             conn.connection.executescript(get_dataset_sql(self.database))
         return engine

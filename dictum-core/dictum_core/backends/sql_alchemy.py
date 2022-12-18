@@ -25,11 +25,11 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.engine.url import URL
-from sqlalchemy.sql import Alias, Join, Select, Subquery
+from sqlalchemy.sql import Alias, ClauseElement, Join, Select, Subquery, literal
 
 from dictum_core.backends.base import Backend, Compiler
 from dictum_core.backends.mixins.arithmetic import ArithmeticCompilerMixin
-from dictum_core.engine import Column
+from dictum_core.engine import Column, LiteralOrderItem
 from dictum_core.exceptions import ShoudntHappenError
 
 logger = logging.getLogger(__name__)
@@ -97,6 +97,8 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
         return isoparse(value)
 
     def IN(self, a, b):
+        if not isinstance(a, ClauseElement):
+            a = literal(a)
         return a.in_(b)
 
     def NOT(self, x):
@@ -107,6 +109,9 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
 
     def OR(self, a, b):
         return or_(a, b)
+
+    def exp(self, a, b):
+        return func.power(a, b)
 
     def isnull(self, value):
         return value == None  # noqa: E711
@@ -147,8 +152,8 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
             order = order_by
         return super().call_window(fn, args, partition, order, rows)
 
-    def window_sum(self, arg, partition, order, rows):
-        return func.sum(arg).over(partition_by=partition, order_by=order)
+    def window_sum(self, args, partition, order, rows):
+        return func.sum(args[0]).over(partition_by=partition, order_by=order)
 
     def window_row_number(self, _, partition, order, rows):
         return func.row_number().over(partition_by=partition, order_by=order)
@@ -197,7 +202,10 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
 
     def compile(self, expr: Tree, tables: dict):
         ct = ColumnTransformer(tables)
-        return self.transformer.transform(ct.transform(expr))
+        result = self.transformer.transform(ct.transform(expr))
+        if isinstance(result, ClauseElement):
+            return result
+        return literal(result)
 
 
 class SQLAlchemyBackend(Backend):
@@ -244,17 +252,13 @@ class SQLAlchemyBackend(Backend):
     def execute(self, query: Select) -> DataFrame:
         return read_sql(query, self.engine, coerce_float=True)
 
-    def table(self, source: Union[str, dict], alias: str) -> Select:
+    def table(self, source: Union[str, dict], identity: str) -> Select:
         if isinstance(source, str):
-            return Table(source, self.metadata, autoload=True).alias(alias).select()
+            source = {"table": source}
+        schema = source.setdefault("schema", self.default_schema)
         return (
-            Table(
-                source["table"],
-                self.metadata,
-                schema=source.get("schema"),
-                autoload=True,
-            )
-            .alias(alias)
+            Table(source["table"], self.metadata, schema=schema, autoload=True)
+            .alias(identity)
             .select()
         )
 
@@ -366,7 +370,7 @@ class SQLAlchemyBackend(Backend):
             selected_columns.append(
                 self.compile(expr=column.expr, tables=tables).label(column.name)
             )
-        return base.with_only_columns(*selected_columns)
+        return base.with_only_columns(*selected_columns, maintain_column_froms=True)
 
     def merge(self, bases: List[Select], on: List[str], left: bool = False):
         """Merge multiple queries. Wrap each in subquery and then full outer join them.
@@ -432,3 +436,11 @@ class SQLAlchemyBackend(Backend):
 
     def limit(self, base: Select, limit: int) -> Select:
         return base.limit(limit)
+
+    def order_by(self, base: Select, items: List[LiteralOrderItem]) -> Select:
+        for item in items:
+            c = base.selected_columns[item.name]
+            if not item.ascending:
+                c = c.desc()
+            base = base.order_by(c)
+        return base

@@ -137,7 +137,7 @@ class TableOperator(Operator):
         return _digest(self.table.id)
 
     def execute(self, backend: Backend):
-        return backend.table(self.table.source, alias=self.table.id)
+        return backend.table(self.table.source, self.table.id)
 
 
 class LeftJoinOperator(Operator):

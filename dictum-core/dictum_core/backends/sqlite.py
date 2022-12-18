@@ -1,17 +1,26 @@
 import warnings
 from functools import cached_property
-from typing import List, Union
+from inspect import signature
+from typing import List
 
-from lark import Tree
 from pandas import DataFrame
-from sqlalchemy import Integer, String, and_, case, cast, create_engine, func, select
+from sqlalchemy import (
+    Integer,
+    String,
+    and_,
+    case,
+    cast,
+    create_engine,
+    event,
+    func,
+    select,
+)
 from sqlalchemy.exc import SAWarning
 from sqlalchemy.sql import Select
 
 from dictum_core.backends.mixins.datediff import DatediffCompilerMixin
 from dictum_core.backends.pandas import PandasBackendFallbackMixin
 from dictum_core.backends.sql_alchemy import SQLAlchemyBackend, SQLAlchemyCompiler
-from dictum_core.engine import Column
 
 trunc_modifiers = {
     "year": ["start of year"],
@@ -38,6 +47,14 @@ part_formats = {
 
 
 class SQLiteCompiler(DatediffCompilerMixin, SQLAlchemyCompiler):
+    def coalesce(self, *args):
+        """SQLite coalesce doesn't support a single arg, so add None if there's
+        only one arg
+        """
+        if len(args) == 1:
+            args = [*args, None]
+        return super().coalesce(*args)
+
     # there's not floor and ceil in SQLite
     def floor(self, arg):
         return case(
@@ -47,6 +64,7 @@ class SQLiteCompiler(DatediffCompilerMixin, SQLAlchemyCompiler):
 
     def ceil(self, arg):
         return case(
+            (arg == cast(arg, Integer), arg),
             (arg > 0, cast(arg, Integer) + 1),
             else_=cast(arg, Integer),
         )
@@ -95,7 +113,6 @@ class SQLiteCompiler(DatediffCompilerMixin, SQLAlchemyCompiler):
         return case({0: 7}, value=value, else_=value)
 
     def datepart(self, part, arg):
-        part = part.lower()
         fmt = part_formats.get(part)
         if fmt is not None:
             return cast(func.strftime(fmt, arg), Integer)
@@ -114,6 +131,9 @@ class SQLiteCompiler(DatediffCompilerMixin, SQLAlchemyCompiler):
         start_day = func.julianday(self.datetrunc("day", start))
         end_day = func.julianday(self.datetrunc("day", end))
         return cast(end_day - start_day, Integer)
+
+    def datediff(self, part, start, end):
+        return super().datediff(part, start, end)
 
     def dateadd(self, part, interval, value):
         """In sqlite adding dates/datetimes is done this way:
@@ -147,19 +167,27 @@ class SQLiteBackend(SQLAlchemyBackend, PandasBackendFallbackMixin):
     def __init__(self, database: str):
         super().__init__(drivername="sqlite", database=database)
 
+    def mount_udfs(self, conn, rec):
+        """Mount user-defined functions not supported natively by SQLite.
+        Functions are implemented as static methods on the backend class.
+        """
+        for name in dir(self):
+            if name.startswith("sqlite_udf_"):
+                fn_name = name.replace("sqlite_udf_", "")
+                attr = getattr(self, name)
+                n_params = len(signature(attr).parameters)
+                conn.create_function(fn_name, n_params, attr)
+
+    @staticmethod
+    def sqlite_udf_power(a, b):
+        return a**b
+
     @cached_property
     def engine(self):
         """SQLite doesn't support connection pooling, so have to redefine this"""
-        return create_engine(self.url)
-
-    def _materialize(self, args: List[Union[Select, DataFrame]]) -> List[DataFrame]:
-        result = []
-        for arg in args:
-            if isinstance(arg, DataFrame):
-                result.append(arg)
-            else:
-                result.append(self.execute(arg))
-        return result
+        engine = create_engine(self.url)
+        event.listen(engine, "connect", self.mount_udfs)
+        return engine
 
     def execute(self, query: Select) -> DataFrame:
         # hide SQLAlchemy warnings about decimals
@@ -220,19 +248,3 @@ class SQLiteBackend(SQLAlchemyBackend, PandasBackendFallbackMixin):
         for add in rest:
             result = self.union_all_full_outer_join(result, add, on, left_join=left)
         return result.subquery().select()
-
-    # because of the missing full outer join, now other operations can
-    # get DataFrames as input
-    def calculate(
-        self, base: Union[Select, DataFrame], columns: List[Column]
-    ) -> Union[Select, DataFrame]:
-        if isinstance(base, DataFrame):
-            return self.calculate_pandas(base, columns)
-        return super().calculate(base, columns)
-
-    def filter(
-        self, base: Union[Select, DataFrame], condition: Tree, subquery: bool = False
-    ) -> Union[Select, DataFrame]:
-        if isinstance(base, DataFrame):
-            return self.filter_pandas(base, condition)
-        return super().filter(base, condition, subquery)

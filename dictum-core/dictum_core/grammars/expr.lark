@@ -8,7 +8,9 @@
 STRING: "'" _STRING_ESC_INNER "'"
 TRUE: "TRUE"i
 FALSE: "FALSE"i
-?literal: TRUE | FALSE | INTEGER | FLOAT | STRING
+DATETIME: "@" /\d{4}[\dTZ\.:+-]*/  // dateutil.parser.isoparse compatible string
+NULL: "NULL"i
+?literal: TRUE | FALSE | INTEGER | FLOAT | STRING | DATETIME | NULL
 
 // Identifier: field (column, measure or dimension on another table), table, function name
 IDENTIFIER: /[a-z_]\w*/i
@@ -63,11 +65,8 @@ le: comp "<=" add_
 eq: comp ("==" | "=") add_
 ne: comp ("!=" | "<>") add_
 // is null / is not null
-_IS: "IS"i
-_NOT: "NOT"i
-_NULL: "NULL"i
-isnull: add_ _IS _NULL
-isnotnull: add_ _IS _NOT _NULL
+isnull: add_ "IS"i "NULL"i
+isnotnull: add_ "IS"i "NOT"i "NULL"i
 
 // in operator
 ?in: comp | in_ | not_in

@@ -6,9 +6,10 @@ from typing import List, Optional, Union
 
 import pkg_resources
 from lark import Token, Transformer, Tree
+from lark.exceptions import VisitError
 from pandas import DataFrame
 
-from dictum_core.engine import Column
+from dictum_core.engine import Column, LiteralOrderItem
 
 
 @dataclass
@@ -68,6 +69,9 @@ class ExpressionTransformer(Transformer):
 
     def FALSE(self, _):
         return self.compiler.FALSE()
+
+    def NULL(self, _):
+        return self.compiler.NULL()
 
     column = PassChildrenToCompiler()
 
@@ -148,7 +152,11 @@ class Compiler(ABC):
 
     @abstractmethod
     def DATETIME(self, value: str):
-        """Convert to datetime"""
+        """datetime literal: @2022-01-01"""
+
+    @abstractmethod
+    def NULL(self, value: str):
+        """NULL literal"""
 
     @abstractmethod
     def isnull(self, value):
@@ -315,6 +323,9 @@ class Compiler(ABC):
     def ceil(self, arg):
         """Numeric ceiling"""
 
+    def ceiling(self, arg):
+        return self.ceil(arg)
+
     @abstractmethod
     def coalesce(self, *args):
         """NULL-coalescing"""
@@ -447,8 +458,15 @@ class Backend(ABC):
     def display_query(self, query):
         return str(query)
 
+    @abstractmethod
+    def execute(self, query) -> DataFrame:
+        """Execute query, return results"""
+
     def compile(self, expr: Tree, tables: dict):
-        return self.compiler.compile(expr, tables)
+        try:
+            return self.compiler.compile(expr, tables)
+        except VisitError as e:
+            raise e.orig_exc
 
     # methods that operators use
     @abstractmethod
@@ -487,8 +505,8 @@ class Backend(ABC):
         """
 
     @abstractmethod
-    def execute(self, query) -> DataFrame:
-        """Execute query, return results"""
+    def order_by(self, base, items: List[LiteralOrderItem]):
+        """Sort dataset"""
 
     @abstractmethod
     def limit(self, base, limit: int):

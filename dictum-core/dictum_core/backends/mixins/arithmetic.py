@@ -11,6 +11,9 @@ class ArithmeticCompilerMixin:
     def STRING(self, value: str):
         return value
 
+    def NULL(self):
+        return None
+
     def TRUE(self):
         return True
 
