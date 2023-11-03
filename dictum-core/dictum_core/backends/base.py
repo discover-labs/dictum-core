@@ -1,10 +1,10 @@
+import importlib.metadata
 from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
 from functools import cached_property, wraps
 from typing import Any, Dict, List, Optional
 
-import pkg_resources
 from lark import Token, Transformer
 from pandas import DataFrame
 
@@ -466,7 +466,12 @@ class Backend(ABC):
 
     @classmethod
     def discover_plugins(cls):
-        for entry_point in pkg_resources.iter_entry_points("dictum.backends"):
+        eps = importlib.metadata.entry_points()
+        if hasattr(eps, "select"):  # python >=3.10
+            eps = eps.select(group="dictum.backends")
+        else:
+            eps = eps.get("dictum.backends", [])  # python <3.10
+        for entry_point in eps:
             cls.registry[entry_point.name] = entry_point.load()
 
     def display_query(self, query):

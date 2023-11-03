@@ -35,9 +35,9 @@ def test_format_default_datetime():
     assert _grain("month") == "November 2022"
     assert _grain("week") == "week 47 of 2022"
     assert _grain("day") == "11/17/2022"
-    assert _grain("hour") == "11/17/22, 12:33 PM"
-    assert _grain("minute") == "11/17/22, 12:33 PM"
-    assert _grain("second") == "Nov 17, 2022, 12:33:11 PM"
+    assert _grain("hour") == "11/17/22, 12:33\u202fPM"
+    assert _grain("minute") == "11/17/22, 12:33\u202fPM"
+    assert _grain("second") == "Nov 17, 2022, 12:33:11\u202fPM"
 
 
 def test_format_default_bool():
