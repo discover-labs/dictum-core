@@ -1,10 +1,10 @@
+import importlib.metadata
 from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
 from functools import cached_property, wraps
 from typing import Any, Dict, List, Optional
 
-import pkg_resources
 from lark import Token, Transformer
 from pandas import DataFrame
 
@@ -466,7 +466,8 @@ class Backend(ABC):
 
     @classmethod
     def discover_plugins(cls):
-        for entry_point in pkg_resources.iter_entry_points("dictum.backends"):
+        breakpoint()
+        for entry_point in importlib.metadata.entry_points().get("dictum.backends", []):
             cls.registry[entry_point.name] = entry_point.load()
 
     def display_query(self, query):

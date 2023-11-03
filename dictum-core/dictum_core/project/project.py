@@ -2,7 +2,6 @@ import importlib
 from pathlib import Path
 from typing import Optional, Union
 
-import altair as alt
 import pandas as pd
 from lark import Tree
 
@@ -13,7 +12,6 @@ from dictum_core.exceptions import MissingPathError, MissingShorthandTableError
 from dictum_core.model import Model
 from dictum_core.project import actions, analyses
 from dictum_core.project.calculations import ProjectDimensions, ProjectMetrics
-from dictum_core.project.chart import ProjectChart
 from dictum_core.project.magics import ProjectMagics
 from dictum_core.project.magics.parser import (
     parse_shorthand_dimension,
@@ -80,10 +78,6 @@ class Project:
         self.m, self.d = self.metrics, self.dimensions
 
         self.latest_calc = None
-
-        if self.model.theme is not None:
-            alt.themes.register("dictum_theme", lambda: self.model.theme)
-            alt.themes.enable("dictum_theme")
 
         self.magic()
 
@@ -190,10 +184,6 @@ class Project:
             methods.
         """
         return analyses.Pivot(self, *metrics)
-
-    @property
-    def chart(self) -> ProjectChart:
-        return ProjectChart(self)
 
     @classmethod
     def example(cls, name: str) -> "Project":
