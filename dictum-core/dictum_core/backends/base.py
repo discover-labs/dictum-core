@@ -466,7 +466,8 @@ class Backend(ABC):
 
     @classmethod
     def discover_plugins(cls):
-        for entry_point in importlib.metadata.entry_points().get("dictum.backends", []):
+        eps = importlib.metadata.entry_points()
+        for entry_point in eps.select(group="dictum.backends"):
             cls.registry[entry_point.name] = entry_point.load()
 
     def display_query(self, query):

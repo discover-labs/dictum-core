@@ -2,9 +2,9 @@ import logging
 from functools import cached_property
 from typing import Any, Dict, List, Optional, Union
 
+import pandas as pd
 import sqlparse
 from lark import Transformer, Tree
-from pandas import DataFrame, read_sql
 from sqlalchemy import (
     Date,
     DateTime,
@@ -91,7 +91,7 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
         return value == None  # noqa: E711
 
     def case(self, whens, else_=None):
-        return case(whens, else_=else_)
+        return case(*whens, else_=else_)
 
     def sum(self, arg):
         return func.sum(arg)
@@ -366,7 +366,6 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
 
 
 class SQLAlchemyBackend(Backend):
-
     compiler_cls = SQLAlchemyCompiler
 
     def __init__(
@@ -393,8 +392,8 @@ class SQLAlchemyBackend(Backend):
         return create_engine(self.url, pool_size=self.pool_size)
 
     @cached_property
-    def metadata(self) -> MetaData:
-        return MetaData(self.engine)
+    def metadata(self):
+        return MetaData()
 
     def __str__(self):
         return repr(self.engine.url)
@@ -406,10 +405,10 @@ class SQLAlchemyBackend(Backend):
             wrap_after=60,
         )
 
-    def execute(self, query: Select) -> DataFrame:
-        return read_sql(query, self.engine, coerce_float=True)
+    def execute(self, query: Select) -> pd.DataFrame:
+        return pd.read_sql(query, self.engine, coerce_float=True)
 
     def table(self, name: str, schema: Optional[str] = None) -> Table:
         if schema is None:
             schema = self.default_schema
-        return Table(name, self.metadata, schema=schema, autoload=True)
+        return Table(name, self.metadata, schema=schema, autoload_with=self.engine)

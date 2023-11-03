@@ -54,7 +54,7 @@ def test_filter(compute_df: callable):
         }
     )
     df = compute_df(query)
-    assert df.iloc[0][0] == 157
+    assert df.iloc[0].iloc[0] == 157
 
 
 @pytest.mark.skip
