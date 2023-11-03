@@ -26,6 +26,8 @@ class QlTransformer(Transformer):
         args = []
         of, within = [], []
         for item in rest:
+            if item is None:
+                continue
             if isinstance(item, Tree):
                 if item.data == "of":
                     of = item.children
@@ -37,15 +39,19 @@ class QlTransformer(Transformer):
 
     def metric(self, children: list):
         id, *transforms = children
-        return QueryMetric(id=id, transforms=transforms)
+        return QueryMetric(id=id, transforms=[t for t in transforms if t is not None])
 
     def scalar_transform(self, children: list):
         id, *args = children
-        return QueryScalarTransform(id=id.lower(), args=args)
+        return QueryScalarTransform(
+            id=id.lower(), args=[a for a in args if a is not None]
+        )
 
     def dimension(self, children: list):
         id, *transforms = children
-        return QueryDimension(id=id, transforms=transforms)
+        return QueryDimension(
+            id=id, transforms=[t for t in transforms if t is not None]
+        )
 
     def alias(self, children: list):
         return children[0]
@@ -67,6 +73,8 @@ class QlTransformer(Transformer):
         metrics, *rest = children
         filters, dimensions, limit = [], [], []
         for item in rest:
+            if item is None:
+                continue
             if item.data == "where":
                 filters = item.children
             elif item.data == "groupby":

@@ -49,7 +49,7 @@ class Preprocessor(Transformer):
         return Tree("call", [fn, *args])
 
 
-parser = Lark.open("expr.lark", rel_to=grammars, start="expr", lexer="standard")
+parser = Lark.open("expr.lark", rel_to=grammars, start="expr", lexer="dynamic")
 preprocessor = Preprocessor()
 
 

@@ -1,3 +1,8 @@
+from pathlib import Path
+from textwrap import dedent
+
+import pytest
+import yaml
 from lark import Tree
 
 from dictum_core.ql import compile_query
@@ -20,263 +25,27 @@ from dictum_core.schema.query import (
 )
 
 
-def test_single_metric():
-    assert parse_ql("select revenue") == Tree(
-        "query",
-        [Tree("select", [Tree("metric_request", [Tree("metric", ["revenue"])])])],
-    )
+def _assert_tree(tree: Tree, expected: str):
+    assert tree.pretty().strip() == dedent(expected).strip()
 
 
-def test_metric_transform():
-    assert parse_ql("select x.sum(1, 2, 3) of (x) within (y, z)") == Tree(
-        "query",
-        [
-            Tree(
-                "select",
-                [
-                    Tree(
-                        "metric_request",
-                        [
-                            Tree(
-                                "metric",
-                                [
-                                    "x",
-                                    Tree(
-                                        "table_transform",
-                                        [
-                                            "sum",
-                                            1,
-                                            2,
-                                            3,
-                                            Tree("of", [Tree("dimension", ["x"])]),
-                                            Tree(
-                                                "within",
-                                                [
-                                                    Tree("dimension", ["y"]),
-                                                    Tree("dimension", ["z"]),
-                                                ],
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            )
-                        ],
-                    )
-                ],
-            )
-        ],
-    )
+with (Path(__file__).parent / "test_ql_parse.yml").open("r") as fp:
+    parse_cases = yaml.safe_load(fp)
 
 
-def test_multiple_metrics():
-    assert parse_ql("select revenue, test") == Tree(
-        "query",
-        [
-            Tree(
-                "select",
-                [
-                    Tree("metric_request", [Tree("metric", ["revenue"])]),
-                    Tree("metric_request", [Tree("metric", ["test"])]),
-                ],
-            ),
-        ],
-    )
-
-
-def test_where_transform():
-    assert parse_ql("select x where y.z(1)") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["z", 1])])]
-            ),
-        ],
-    )
-
-
-def test_where_transforms():
-    assert parse_ql("select x where y.a(1).b('c').d = 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where",
-                [
-                    Tree(
-                        "dimension",
-                        [
-                            "y",
-                            Tree("scalar_transform", ["a", 1]),
-                            Tree("scalar_transform", ["b", "c"]),
-                            Tree("scalar_transform", ["d"]),
-                            Tree("scalar_transform", ["eq", 0]),
-                        ],
-                    )
-                ],
-            ),
-        ],
-    )
-
-
-def test_where_gt():
-    assert parse_ql("select x where y > 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["gt", 0])])]
-            ),
-        ],
-    )
-
-
-def test_where_ge():
-    assert parse_ql("select x where y >= 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["ge", 0])])]
-            ),
-        ],
-    )
-
-
-def test_where_lt():
-    assert parse_ql("select x where y < 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["lt", 0])])]
-            ),
-        ],
-    )
-
-
-def test_where_le():
-    assert parse_ql("select x where y <= 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["le", 0])])]
-            ),
-        ],
-    )
-
-
-def test_where_eq():
-    assert parse_ql("select x where y = 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["eq", 0])])]
-            ),
-        ],
-    )
-
-
-def test_where_ne():
-    assert parse_ql("select x where y <> 0") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where", [Tree("dimension", ["y", Tree("scalar_transform", ["ne", 0])])]
-            ),
-        ],
-    )
-
-
-def test_groupby():
-    assert parse_ql("select x by y") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree("groupby", [Tree("dimension_request", [Tree("dimension", ["y"])])]),
-        ],
-    )
-
-
-def test_groupby_transform():
-    assert parse_ql("select x group by y.z(10)") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "groupby",
-                [
-                    Tree(
-                        "dimension_request",
-                        [Tree("dimension", ["y", Tree("scalar_transform", ["z", 10])])],
-                    )
-                ],
-            ),
-        ],
-    )
-
-
-def test_quoted_identifier():
-    assert parse_ql('select "revenue something"').children[0] == Tree(
-        "select", [Tree("metric_request", [Tree("metric", ["revenue something"])])]
-    )
-
-
-def test_dimension_alias():
-    assert parse_ql("select metric by dim as dim1") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["metric"])])]),
-            Tree(
-                "groupby",
-                [
-                    Tree(
-                        "dimension_request",
-                        [Tree("dimension", ["dim"]), Tree("alias", ["dim1"])],
-                    )
-                ],
-            ),
-        ],
-    )
-
-
-def test_dimension_transform_alias():
-    assert parse_ql("select metric by dim.test as dim1") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["metric"])])]),
-            Tree(
-                "groupby",
-                [
-                    Tree(
-                        "dimension_request",
-                        [
-                            Tree(
-                                "dimension", ["dim", Tree("scalar_transform", ["test"])]
-                            ),
-                            Tree("alias", ["dim1"]),
-                        ],
-                    )
-                ],
-            ),
-        ],
-    )
-
-
-def test_in():
-    assert parse_ql("select x where y in ('a', 1)") == Tree(
-        "query",
-        [
-            Tree("select", [Tree("metric_request", [Tree("metric", ["x"])])]),
-            Tree(
-                "where",
-                [Tree("dimension", ["y", Tree("scalar_transform", ["isin", "a", 1])])],
-            ),
-        ],
-    )
+@pytest.mark.parametrize("case", parse_cases)
+def test_ql_parse(case: dict):
+    _kind_mapping = {
+        "dimension": parse_dimension,
+        "dimension_request": parse_dimension_request,
+        "metric_request": parse_metric_request,
+        "query": parse_ql,
+    }
+    val = case["val"]
+    expected = case["expected"]
+    kind = case["kind"]
+    func = _kind_mapping[kind]
+    assert func(val).pretty().strip() == dedent(expected.strip())
 
 
 def test_compile_query():
@@ -376,43 +145,6 @@ def test_compile_dimension_transform_alias():
     )
 
 
-def test_parse_filter():
-    assert parse_dimension("x.y('z')") == Tree(
-        "dimension", ["x", Tree("scalar_transform", ["y", "z"])]
-    )
-
-
-def test_compile_filter():
-    assert compile_dimension("x.y('z')") == QueryDimension.parse_obj(
-        {"id": "x", "transforms": [{"id": "y", "args": ["z"]}]}
-    )
-
-
-def test_filter_null():
-    assert parse_dimension("x is null") == Tree(
-        "dimension", ["x", Tree("scalar_transform", ["isnull"])]
-    )
-    assert parse_dimension("x is not null") == Tree(
-        "dimension", ["x", Tree("scalar_transform", ["isnotnull"])]
-    )
-
-
-def test_compile_filter_null():
-    assert compile_dimension("x is null") == QueryDimension.parse_obj(
-        {"id": "x", "transforms": [{"id": "isnull", "args": []}]}
-    )
-
-
-def test_parse_dimension_request():
-    assert parse_dimension_request("x.y(1)") == Tree(
-        "dimension_request",
-        [Tree("dimension", ["x", Tree("scalar_transform", ["y", 1])])],
-    )
-    assert parse_dimension_request("x") == Tree(
-        "dimension_request", [Tree("dimension", ["x"])]
-    )
-
-
 def test_compile_dimension_request():
     assert compile_dimension_request("x") == QueryDimensionRequest.parse_obj(
         {"dimension": {"id": "x"}}
@@ -427,34 +159,6 @@ def test_compile_dimension_request():
             "dimension": {"id": "x", "transforms": [{"id": "y", "args": ["z", 1]}]},
             "alias": "a",
         }
-    )
-
-
-def test_parse_metric_request():
-    assert parse_metric_request("x.y(1, 'f') of (a) within (b, c) as al") == Tree(
-        "metric_request",
-        [
-            Tree(
-                "metric",
-                [
-                    "x",
-                    Tree(
-                        "table_transform",
-                        [
-                            "y",
-                            1,
-                            "f",
-                            Tree("of", [Tree("dimension", ["a"])]),
-                            Tree(
-                                "within",
-                                [Tree("dimension", ["b"]), Tree("dimension", ["c"])],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-            Tree("alias", ["al"]),
-        ],
     )
 
 
@@ -482,12 +186,13 @@ def test_compile_metric_request():
     )
 
 
-def test_parse_unary_not():
-    assert parse_dimension("x.y(1).not") == Tree(
-        "dimension",
-        [
-            "x",
-            Tree("scalar_transform", ["y", 1]),
-            Tree("scalar_transform", ["invert"]),
-        ],
+def test_compile_filter():
+    assert compile_dimension("x.y('z')") == QueryDimension.parse_obj(
+        {"id": "x", "transforms": [{"id": "y", "args": ["z"]}]}
+    )
+
+
+def test_compile_filter_null():
+    assert compile_dimension("x is null") == QueryDimension.parse_obj(
+        {"id": "x", "transforms": [{"id": "isnull", "args": []}]}
     )

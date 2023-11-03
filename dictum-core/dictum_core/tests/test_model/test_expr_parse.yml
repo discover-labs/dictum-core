@@ -1,0 +1,233 @@
+- val: "42"
+  expected: |
+    expr	42
+
+- val: "3.14"
+  expected: |
+    expr	3.14
+
+- val: TrUe
+  expected: |
+    expr	TrUe
+
+- val: fAlSe
+  expected: |
+    expr	fAlSe
+
+- val: 1 and 1
+  expected: |
+    expr
+      AND
+        1
+        1
+
+- val: (1)and(1)
+  expected: |
+    expr
+      AND
+        1
+        1
+
+- val: "1and(1)"
+  expected: |
+    expr
+      AND
+        1
+        1
+
+- val: "1and1"
+  expected: |
+    expr
+      AND
+        1
+        1
+
+- val: col
+  expected: |
+    expr
+      column	col
+
+- val: related.col
+  expected: |
+    expr
+      column
+        related
+        col
+
+- val: related.other.col
+  expected: |
+    expr
+      column
+        related
+        other
+        col
+
+- val: "2 * 2"
+  expected: |
+    expr
+      mul
+        2
+        2
+
+- val: "1 <> 1"
+  expected: |
+    expr
+      ne
+        1
+        1
+
+- val: "1 != 1"
+  expected: |
+    expr
+      ne
+        1
+        1
+
+- val: "7 // 3"
+  expected: |
+    expr
+      call
+        floor
+        div
+          7
+          3
+
+- val: "'test'" # unquote
+  expected: |
+    expr	test
+
+- val: x in (1, 2, 3)
+  expected: |
+    expr
+      IN
+        column	x
+        1
+        2
+        3
+
+- val: x in (0)
+  expected: |
+    expr
+      IN
+        column	x
+        0
+
+- val: x > 0 and y in (0)
+  expected: |
+    expr
+      AND
+        gt
+          column	x
+          0
+        IN
+          column	y
+          0
+
+- val: y in (0) and x > 0
+  expected: |
+    expr
+      AND
+        IN
+          column	y
+          0
+        gt
+          column	x
+          0
+
+- val: x or 2 + 2 in (4)
+  expected: |
+    expr
+      OR
+        column	x
+        IN
+          add
+            2
+            2
+          4
+
+- val: case when x > 0 then 1 end
+  expected: |
+    expr
+      case
+        gt
+          column	x
+          0
+        1
+        None
+
+- val: case when x > 0 then 1 else -1 end
+  expected: |
+    expr
+      case
+        gt
+          column	x
+          0
+        1
+        -1
+
+- val: case when x > 0 then 1 when x < 0 then -1 else 0 end
+  expected: |
+    expr
+      case
+        gt
+          column	x
+          0
+        1
+        lt
+          column	x
+          0
+        -1
+        0
+
+- val: "@ >= 10"
+  expected: |
+    expr
+      ge
+        @
+        10
+
+- val: test
+  missing: 0
+  expected: |
+    expr
+      call
+        coalesce
+        column	test
+        0
+
+- val: x is null
+  expected: |
+    expr
+      isnull
+        column	x
+
+- val: x is not null
+  expected: |
+    expr
+      NOT
+        isnull
+          column	x
+
+- val: not if(x > 0, 1, 0) = 0
+  expected: |
+    expr
+      NOT
+        eq
+          call
+            IF
+            gt
+              column	x
+              0
+            1
+            0
+          0
+
+- val: count(*)
+  expected: |
+    expr
+      call	count
+
+- val: count(*)
+  expected: |
+    expr
+      call	count

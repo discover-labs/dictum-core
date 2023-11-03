@@ -1,0 +1,440 @@
+---
+- val: select revenue
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            revenue
+            None
+            None
+          None
+      None
+      None
+      None
+
+- val: select x.sum(1, 2, 3) of (x) within (y, z)
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            table_transform
+              sum
+              1
+              2
+              3
+              of
+                dimension
+                  x
+                  None
+              within
+                dimension
+                  y
+                  None
+                dimension
+                  z
+                  None
+            None
+          None
+      None
+      None
+      None
+
+- val: select revenue, test
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            revenue
+            None
+            None
+          None
+        metric_request
+          metric
+            test
+            None
+            None
+          None
+      None
+      None
+      None
+
+- val: select x where y.z(1)
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            z
+            1
+          None
+      None
+      None
+
+- val: select x where y.a(1).b('c').d = 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            a
+            1
+          scalar_transform
+            b
+            c
+          scalar_transform
+            d
+            None
+          scalar_transform
+            eq
+            0
+      None
+      None
+
+- val: select x where y > 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            gt
+            0
+      None
+      None
+
+- val: select x where y >= 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            ge
+            0
+      None
+      None
+
+- val: select x where y < 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            lt
+            0
+      None
+      None
+
+- val: select x where y <= 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            le
+            0
+      None
+      None
+
+- val: select x where y = 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            eq
+            0
+      None
+      None
+
+- val: select x where y <> 0
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            ne
+            0
+      None
+      None
+
+- val: select x by y
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      None
+      groupby
+        dimension_request
+          dimension
+            y
+            None
+          None
+      None
+
+- val: select x group by y.z(10)
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      None
+      groupby
+        dimension_request
+          dimension
+            y
+            scalar_transform
+              z
+              10
+            None
+          None
+      None
+
+- val: select "revenue something"
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            revenue something
+            None
+            None
+          None
+      None
+      None
+      None
+
+- val: select metric by dim as dim1
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            metric
+            None
+            None
+          None
+      None
+      groupby
+        dimension_request
+          dimension
+            dim
+            None
+          alias	dim1
+      None
+
+- val: select metric by dim.test as dim1
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            metric
+            None
+            None
+          None
+      None
+      groupby
+        dimension_request
+          dimension
+            dim
+            scalar_transform
+              test
+              None
+            None
+          alias	dim1
+      None
+
+- val: select x where y in ('a', 1)
+  kind: query
+  expected: |
+    query
+      select
+        metric_request
+          metric
+            x
+            None
+            None
+          None
+      where
+        dimension
+          y
+          scalar_transform
+            isin
+            a
+            1
+      None
+      None
+
+- val: x.y('z')
+  kind: dimension
+  expected: |
+    dimension
+      x
+      scalar_transform
+        y
+        z
+      None
+
+- val: x is null
+  kind: dimension
+  expected: |
+    dimension
+      x
+      scalar_transform	isnull
+
+- val: x is not null
+  kind: dimension
+  expected: |
+    dimension
+      x
+      scalar_transform	isnotnull
+
+- val: x.y(1).not
+  kind: dimension
+  expected: |
+    dimension
+      x
+      scalar_transform
+        y
+        1
+      scalar_transform
+        invert
+        None
+      None
+
+- val: x.y(1)
+  kind: dimension_request
+  expected: |
+    dimension_request
+      dimension
+        x
+        scalar_transform
+          y
+          1
+        None
+      None
+
+- val: x
+  kind: dimension_request
+  expected: |
+    dimension_request
+      dimension
+        x
+        None
+      None
+
+- val: x.y(1, 'f') of (a) within (b, c) as al
+  kind: metric_request
+  expected: |
+    metric_request
+      metric
+        x
+        table_transform
+          y
+          1
+          f
+          of
+            dimension
+              a
+              None
+          within
+            dimension
+              b
+              None
+            dimension
+              c
+              None
+        None
+      alias	al
