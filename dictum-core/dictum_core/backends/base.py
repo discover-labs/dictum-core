@@ -466,7 +466,6 @@ class Backend(ABC):
 
     @classmethod
     def discover_plugins(cls):
-        breakpoint()
         for entry_point in importlib.metadata.entry_points().get("dictum.backends", []):
             cls.registry[entry_point.name] = entry_point.load()
 
