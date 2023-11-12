@@ -2,4 +2,4 @@ from dictum_core.project import Project
 
 __all__ = ["Project"]
 
-__version__ = "0.1.12"
+__version__ = "0.1.13"

@@ -30,7 +30,7 @@ def compute_results(chinook: Model, engine: Engine, backend: Backend):
 
 
 def test_groupby(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "track_count"}}],
             "dimensions": [{"dimension": {"id": "genre"}}],
@@ -41,7 +41,7 @@ def test_groupby(compute_df: callable):
 
 
 def test_filter(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "items_sold"}}],
             "filters": [
@@ -74,7 +74,7 @@ def test_convert_datetime(chinook: Model, connection):
 
 
 def test_metric_not_measure(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [
                 {"metric": {"id": "revenue"}},
@@ -88,7 +88,7 @@ def test_metric_not_measure(compute_df: callable):
 
 
 def test_metric_with_groupby(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "arppu"}}, {"metric": {"id": "track_count"}}],
             "dimensions": [{"dimension": {"id": "genre"}}],
@@ -99,7 +99,7 @@ def test_metric_with_groupby(compute_df: callable):
 
 
 def test_multiple_facts(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [
                 {"metric": {"id": "items_sold"}},
@@ -112,7 +112,7 @@ def test_multiple_facts(compute_df: callable):
 
 
 def test_multiple_facts_dimensions(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [
                 {"metric": {"id": "items_sold"}},
@@ -130,7 +130,7 @@ def test_multiple_facts_dimensions(compute_df: callable):
 
 def test_if(compute_df: callable):
     """Test if() function and case when ... then ... else ... end constructs"""
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "items_sold"}}],
             "dimensions": [
@@ -144,7 +144,7 @@ def test_if(compute_df: callable):
 
 
 def test_subquery_join(compute_df: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "items_sold"}}],
             "dimensions": [{"dimension": {"id": "customer_orders_amount_10_bins"}}],
@@ -246,7 +246,7 @@ def test_datediff(compute):
 
 
 def test_date(compute_results: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "revenue"}}],
             "dimensions": [{"dimension": {"id": "invoice_date"}}],
@@ -259,7 +259,7 @@ def test_date(compute_results: callable):
 
 
 def test_datetime(compute_results: callable):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "revenue"}}],
             "dimensions": [{"dimension": {"id": "invoice_datetime"}}],
@@ -273,6 +273,6 @@ def test_datetime(compute_results: callable):
 
 def test_division(compute_results: callable):
     """Test division semantics with an integer."""
-    query = Query.parse_obj({"metrics": [{"metric": {"id": "pct_music_orders"}}]})
+    query = Query.model_validate({"metrics": [{"metric": {"id": "pct_music_orders"}}]})
     results = compute_results(query)
     assert round(results[0]["pct_music_orders"], 2) == 0.95

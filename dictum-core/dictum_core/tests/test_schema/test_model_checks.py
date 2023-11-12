@@ -21,7 +21,7 @@ from dictum_core.schema.model.model import Model
 
 
 def test_check_duplicate_dimensions():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {
@@ -45,7 +45,7 @@ def test_check_duplicate_dimensions():
 
 
 def test_check_model_ids_checks_tables():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {"__t1": {"source": "t1"}},
@@ -56,7 +56,7 @@ def test_check_model_ids_checks_tables():
 
 
 def test_check_model_ids_checks_metrics():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {"name": "test", "metrics": {"__m1": {"name": "m1", "expr": "m1"}}}
     )
     with pytest.raises(InvalidIDError):
@@ -64,7 +64,7 @@ def test_check_model_ids_checks_metrics():
 
 
 def test_check_model_ids_checks_unions():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {"name": "test", "unions": {"__id": {"name": "test", "type": "test"}}}
     )
     with pytest.raises(InvalidIDError):
@@ -72,7 +72,7 @@ def test_check_model_ids_checks_unions():
 
 
 def test_check_model_ids_checks_related():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {
@@ -88,7 +88,7 @@ def test_check_model_ids_checks_related():
 
 
 def test_check_model_ids_checks_dimensions():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {
@@ -129,7 +129,7 @@ def test_check_id_valid_ok():
 
 
 def test_check_metric_table_consistency_checks_time():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "metrics": {
@@ -146,7 +146,7 @@ def test_check_metric_table_consistency_checks_time():
 
 
 def test_check_metric_table_consistency_checks_filter():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "metrics": {
@@ -163,7 +163,7 @@ def test_check_metric_table_consistency_checks_filter():
 
 
 def test_check_missing_time_dimensions_checks_metrics():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "metrics": {
@@ -181,7 +181,7 @@ def test_check_missing_time_dimensions_checks_metrics():
 
 
 def test_check_missing_unions():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {
@@ -204,7 +204,7 @@ def test_check_missing_unions():
 
 
 def test_check_related_tables_checks_table():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {
@@ -220,7 +220,7 @@ def test_check_related_tables_checks_table():
 
 
 def check_test_related_tables_checks_related_key():
-    model = Model.parse_obj(
+    model = Model.model_validate(
         {
             "name": "test",
             "tables": {

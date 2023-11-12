@@ -52,7 +52,7 @@ class Model:
         for id_, union in model.unions.items():
             union_type = resolve_type(union.type)
             obj.dimensions[id_] = DimensionsUnion(
-                **union.dict(include=displayed_fields),
+                **union.model_dump(include=displayed_fields),
                 id=id_,
                 format=Format(
                     type=union_type,
@@ -66,7 +66,7 @@ class Model:
         # add all tables, their relationships and calculations
         for id_, config_table in model.tables.items():
             table = obj.add_table(
-                **config_table.dict(
+                **config_table.model_dump(
                     include={"source", "description", "primary_key", "filters"}
                 ),
                 id=id_,
@@ -89,7 +89,7 @@ class Model:
                     format_config=dimension.format,
                     type=dimension.type,
                     currency=model.currency,
-                    **dimension.dict(include=table_calc_fields | {"union"}),
+                    **dimension.model_dump(include=table_calc_fields | {"union"}),
                 )
 
             # add table measures
@@ -100,7 +100,7 @@ class Model:
                     format_config=measure.format,
                     type=measure.type,
                     currency=model.currency,
-                    **measure.dict(
+                    **measure.model_dump(
                         include=table_calc_fields | {"str_filter", "str_time"}
                     ),
                 )
@@ -117,7 +117,7 @@ class Model:
                 type=metric.type,
                 format_config=metric.format,
                 currency=model.currency,
-                **metric.dict(
+                **metric.model_dump(
                     include=table_calc_fields | {"str_filter", "str_time", "table"}
                 ),
             )

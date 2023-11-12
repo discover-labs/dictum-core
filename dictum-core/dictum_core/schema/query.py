@@ -1,3 +1,4 @@
+import json
 from hashlib import md5
 from typing import List, Optional
 
@@ -73,11 +74,12 @@ class QueryCalculation(BaseModel):
 
     @property
     def digest(self) -> str:
-        return md5(self.json(sort_keys=True).encode("UTF-8")).hexdigest()
+        data = self.model_dump()
+        return md5(json.dumps(data, sort_keys=True).encode("UTF-8")).hexdigest()
 
 
 class QueryCalculationRequest(BaseModel):
-    alias: Optional[str]
+    alias: Optional[str] = None
 
     @property
     def name(self) -> str:
@@ -141,7 +143,7 @@ class QueryMetric(QueryCalculation):
 
 class QueryMetricRequest(QueryCalculationRequest):
     metric: QueryMetric
-    alias: Optional[str]
+    alias: Optional[str] = None
 
     @property
     def calculation(self) -> QueryMetric:
@@ -163,7 +165,8 @@ class Query(BaseModel):
 
     @property
     def digest(self) -> str:
-        return md5(self.json(sort_keys=True).encode("UTF-8")).hexdigest()
+        data = self.model_dump()
+        return md5(json.dumps(data, sort_keys=True).encode("UTF-8")).hexdigest()
 
 
-QueryTableTransform.update_forward_refs()
+QueryTableTransform.model_rebuild()

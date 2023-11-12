@@ -7,9 +7,9 @@ from dictum_core.schema.model.format import Formatted
 
 class Displayed(Formatted):
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     type: str
-    missing: Optional[Any]
+    missing: Optional[Any] = None
 
 
 class Calculation(Displayed):
@@ -18,8 +18,8 @@ class Calculation(Displayed):
 
 class AggregateCalculation(Calculation):
     type: str = "float"
-    str_filter: Optional[str] = Field(alias="filter")
-    str_time: Optional[str] = Field(alias="time")
+    str_filter: Optional[str] = Field(None, alias="filter")
+    str_time: Optional[str] = Field(None, alias="time")
 
 
 class Measure(AggregateCalculation):
@@ -27,11 +27,11 @@ class Measure(AggregateCalculation):
 
 
 class Metric(AggregateCalculation):
-    table: Optional[str]  # this one is for metric-measures
+    table: Optional[str] = None  # this one is for metric-measures
 
 
 class Dimension(Calculation):
-    union: Optional[str]
+    union: Optional[str] = None
 
 
 class DetachedDimension(Dimension):

@@ -112,7 +112,7 @@ def test_render_request():
 
 def test_render_query_metric():
     assert (
-        QueryMetric.parse_obj(
+        QueryMetric.model_validate(
             {"id": "test", "transforms": [{"id": "x"}, {"id": "gt", "args": [1]}]}
         ).render()
         == "test.x().gt(1)"

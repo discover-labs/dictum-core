@@ -43,7 +43,7 @@ class Profiles(BaseModel):
 
 class Project(BaseModel):
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     locale: str = "en_US"
     currency: str = "USD"
 
@@ -52,7 +52,7 @@ class Project(BaseModel):
     unions_path: str = "unions.yml"
     profiles_path: str = "profiles.yml"
 
-    root: Optional[Path]
+    root: Optional[Path] = None
 
     @classmethod
     def load(cls, path: Union[str, Path]):
@@ -66,14 +66,14 @@ class Project(BaseModel):
             )
         data = _load_yaml_template(project_yml)
         data["root"] = str(path)
-        return cls.parse_obj(data)
+        return cls.model_validate(data)
 
     def get_profile(self, profile=None) -> dict:
         profiles_path = self.root / self.profiles_path
         if not profiles_path.exists():
             raise MissingPathError(profiles_path)
         data = _load_yaml_template(self.root / self.profiles_path)
-        profiles = Profiles.parse_obj(data)
+        profiles = Profiles.model_validate(data)
         profile = profiles.default_profile if profile is None else profile
         try:
             return profiles.profiles[profile]

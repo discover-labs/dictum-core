@@ -9,9 +9,9 @@ FormatKind = Literal[
 
 class FormatConfig(BaseModel):
     kind: FormatKind
-    pattern: Optional[str]
-    skeleton: Optional[str]
-    currency: Optional[str]
+    pattern: Optional[str] = None
+    skeleton: Optional[str] = None
+    currency: Optional[str] = None
 
     @root_validator(skip_on_failure=True)
     def validate_pattern_skeleton(cls, values):
@@ -30,5 +30,4 @@ Format = Union[FormatKind, FormatConfig]
 
 
 class Formatted(BaseModel):
-
-    format: Optional[Format]
+    format: Optional[Format] = None
