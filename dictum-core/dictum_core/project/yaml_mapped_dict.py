@@ -18,7 +18,6 @@ def _update_recursive(d, u):
 
 
 class YAMLMappedDict(UserDict):
-
     file_extensions = {".yaml", ".yml"}
 
     def __init__(self, data=None, /, **kwargs):

@@ -68,7 +68,7 @@ class Project:
         self.backend = backend
 
         self.model_data = model_data
-        model_config = schema.Model.parse_obj(model_data)
+        model_config = schema.Model.model_validate(model_data)
 
         self.model = Model.from_config(model_config)
 
@@ -103,7 +103,9 @@ class Project:
             )
             print(f"Created a new project at {path}")
             return Project.from_path(path=path)
-        model_data = schema.Model(name=name, locale=locale, currency=currency).dict()
+        model_data = schema.Model(
+            name=name, locale=locale, currency=currency
+        ).model_dump()
         model_data = YAMLMappedDict(model_data)
         project_config = schema.Project(name=name, locale=locale, currency=currency)
         return cls(
@@ -320,7 +322,7 @@ class Project:
     def update_shorthand_dimension(self, definition: str, table: Optional[str] = None):
         tree = parse_shorthand_dimension(definition)
         id_, kwargs = _get_calculation_kwargs(definition, tree)
-        schema.Dimension.parse_obj(kwargs)  # validate before updating
+        schema.Dimension.model_validate(kwargs)  # validate before updating
         if table is None:
             table = kwargs.pop("table", None)
         if table is None:
@@ -345,7 +347,7 @@ class Project:
         new = self.model_data.copy()
         new.update_recursive(update)
 
-        model_config = schema.Model.parse_obj(new)
+        model_config = schema.Model.model_validate(new)
         self.model = Model.from_config(model_config)  # model checks happen here
         # we're ok, can update model data
         self.model_data = new

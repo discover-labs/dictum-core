@@ -49,13 +49,13 @@ def test_ql_parse(case: dict):
 
 
 def test_compile_query():
-    assert compile_query("select x") == Query.parse_obj(
+    assert compile_query("select x") == Query.model_validate(
         {"metrics": [{"metric": {"id": "x"}}]}
     )
 
 
 def test_compile_groupby():
-    q = Query.parse_obj(
+    q = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "x"}}],
             "dimensions": [{"dimension": {"id": "y"}}],
@@ -66,7 +66,7 @@ def test_compile_groupby():
 
 
 def test_compile_groupby_transforms():
-    assert compile_query("select x, y by z.p(10)") == Query.parse_obj(
+    assert compile_query("select x, y by z.p(10)") == Query.model_validate(
         {
             "metrics": [{"metric": {"id": "x"}}, {"metric": {"id": "y"}}],
             "dimensions": [
@@ -77,7 +77,7 @@ def test_compile_groupby_transforms():
 
 
 def test_compile_where():
-    assert compile_query("select x where y.z(10)") == Query.parse_obj(
+    assert compile_query("select x where y.z(10)") == Query.model_validate(
         {
             "metrics": [{"metric": {"id": "x"}}],
             "filters": [{"id": "y", "transforms": [{"id": "z", "args": [10]}]}],
@@ -95,7 +95,7 @@ def test_compile_multiple_groupbys():
        c,
        f.h(11)
     """
-    ) == Query.parse_obj(
+    ) == Query.model_validate(
         {
             "metrics": [{"metric": {"id": "x"}}, {"metric": {"id": "y"}}],
             "dimensions": [
@@ -120,7 +120,7 @@ def test_compile_multiple_groupbys():
 
 
 def test_compile_dimension_alias():
-    assert compile_query("select metric by dim as dim1") == Query.parse_obj(
+    assert compile_query("select metric by dim as dim1") == Query.model_validate(
         {
             "metrics": [{"metric": {"id": "metric"}}],
             "dimensions": [{"dimension": {"id": "dim"}, "alias": "dim1"}],
@@ -129,7 +129,7 @@ def test_compile_dimension_alias():
 
 
 def test_compile_dimension_transform_alias():
-    assert compile_query("select x by y.a.b(10) as z") == Query.parse_obj(
+    assert compile_query("select x by y.a.b(10) as z") == Query.model_validate(
         {
             "metrics": [{"metric": {"id": "x"}}],
             "dimensions": [
@@ -146,15 +146,15 @@ def test_compile_dimension_transform_alias():
 
 
 def test_compile_dimension_request():
-    assert compile_dimension_request("x") == QueryDimensionRequest.parse_obj(
+    assert compile_dimension_request("x") == QueryDimensionRequest.model_validate(
         {"dimension": {"id": "x"}}
     )
-    assert compile_dimension_request("x.y") == QueryDimensionRequest.parse_obj(
+    assert compile_dimension_request("x.y") == QueryDimensionRequest.model_validate(
         {"dimension": {"id": "x", "transforms": [{"id": "y"}]}}
     )
     assert compile_dimension_request(
         "x.y('z', 1) as a"
-    ) == QueryDimensionRequest.parse_obj(
+    ) == QueryDimensionRequest.model_validate(
         {
             "dimension": {"id": "x", "transforms": [{"id": "y", "args": ["z", 1]}]},
             "alias": "a",
@@ -165,7 +165,7 @@ def test_compile_dimension_request():
 def test_compile_metric_request():
     assert compile_metric_request(
         "x.y(1, 'f') of (a) within (b, c.n(1)) as al"
-    ) == QueryMetricRequest.parse_obj(
+    ) == QueryMetricRequest.model_validate(
         {
             "metric": {
                 "id": "x",
@@ -187,12 +187,12 @@ def test_compile_metric_request():
 
 
 def test_compile_filter():
-    assert compile_dimension("x.y('z')") == QueryDimension.parse_obj(
+    assert compile_dimension("x.y('z')") == QueryDimension.model_validate(
         {"id": "x", "transforms": [{"id": "y", "args": ["z"]}]}
     )
 
 
 def test_compile_filter_null():
-    assert compile_dimension("x is null") == QueryDimension.parse_obj(
+    assert compile_dimension("x is null") == QueryDimension.model_validate(
         {"id": "x", "transforms": [{"id": "isnull", "args": []}]}
     )

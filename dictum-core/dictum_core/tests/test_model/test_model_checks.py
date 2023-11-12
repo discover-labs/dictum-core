@@ -22,14 +22,14 @@ from dictum_core.schema.model.checks import check_model_config
 
 
 def build_model(data: dict) -> Model:
-    config = schema.Model.parse_obj(data)
+    config = schema.Model.model_validate(data)
     return Model.from_config(config)
 
 
 @pytest.fixture(scope="function")
 def model() -> Model:
     """Provides a valid model that can be broken for tests"""
-    config = schema.Model.parse_obj(
+    config = schema.Model.model_validate(
         {
             "name": "test",
             "tables": {

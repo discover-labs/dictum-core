@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 class CatalogType(BaseModel):
     name: str
-    grain: Optional[str]
+    grain: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -13,7 +13,7 @@ class CatalogType(BaseModel):
 
 class CatalogFormat(BaseModel):
     type: CatalogType
-    d3_format: Optional[str]
+    d3_format: Optional[str] = None
 
     class Config:
         orm_mode = True
@@ -22,8 +22,8 @@ class CatalogFormat(BaseModel):
 class CatalogCalculation(BaseModel):
     id: str
     name: str
-    description: Optional[str]
-    expr: Optional[str] = Field(alias="str_expr")
+    description: Optional[str] = None
+    expr: Optional[str] = Field(None, alias="str_expr")
     format: CatalogFormat
     type: CatalogType
 
@@ -39,7 +39,7 @@ class MetricLineageItem(BaseModel):
     id: str
     name: str
     type: Literal["Metric", "Measure", "Dimension", "Column"]
-    parent: Optional[str]
+    parent: Optional[str] = None
 
 
 class MetricLineage(BaseModel):

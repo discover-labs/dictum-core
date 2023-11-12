@@ -10,7 +10,7 @@ from dictum_core.schema.model.format import Formatted
 class Transform(Formatted):
     id: ID
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     args: list = []
     str_expr: str = Field(..., alias="expr")
-    return_type: Optional[Type]
+    return_type: Optional[Type] = None

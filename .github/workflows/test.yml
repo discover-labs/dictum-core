@@ -41,11 +41,11 @@ jobs:
           backend: postgres
 
   test-backend-vertica:
-    name: Run tests for Vertica backend
+    name: Run tests for MariaDB backend
     runs-on: ubuntu-latest
     needs: test
     steps:
       - uses: actions/checkout@v3
       - uses: ./.github/actions/test-backend
         with:
-          backend: vertica
+          backend: mariadb

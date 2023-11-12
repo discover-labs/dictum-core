@@ -9,13 +9,13 @@ from dictum_core.schema.model.calculations import Dimension, Measure
 class RelatedTable(BaseModel):
     str_table: str = Field(alias="table")
     foreign_key: str
-    str_related_key: Optional[str] = Field(alias="related_key")
+    str_related_key: Optional[str] = Field(None, alias="related_key")
 
 
 class Table(BaseModel):
-    description: Optional[str]
+    description: Optional[str] = None
     source: Union[str, Dict]
-    primary_key: Optional[str]
+    primary_key: Optional[str] = None
     related: Dict[ID, RelatedTable] = {}
     measures: Dict[ID, Measure] = {}
     dimensions: Dict[ID, Dimension] = {}

@@ -16,7 +16,7 @@ root_keys = {"tables", "metrics", "unions"}
 
 class Model(BaseModel):
     name: str
-    description: Optional[str]
+    description: Optional[str] = None
     locale: str = "en_US"
     currency: str = "USD"
 
@@ -29,4 +29,4 @@ class Model(BaseModel):
         ID, Transform
     ] = {}  # ignored for now, TODO: load as LiteralTransform
 
-    theme: Optional[dict]
+    theme: Optional[dict] = None

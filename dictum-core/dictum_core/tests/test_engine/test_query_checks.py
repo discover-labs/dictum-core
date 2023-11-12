@@ -89,7 +89,7 @@ def test_check_scalar_transform_types(model: Model, query: Query):
 
 
 def test_check_dimension_join_paths(model: Model):
-    query = Query.parse_obj(
+    query = Query.model_validate(
         {
             "metrics": [{"metric": {"id": "track_count"}}],
             "dimensions": [{"dimension": {"id": "invoice_date"}}],
