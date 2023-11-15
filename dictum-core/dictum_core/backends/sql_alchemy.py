@@ -91,7 +91,7 @@ class SQLAlchemyCompiler(ArithmeticCompilerMixin, Compiler):
         return value == None  # noqa: E711
 
     def case(self, whens, else_=None):
-        return case(*whens, else_=else_)
+        return case(*(tuple(w) for w in whens), else_=else_)
 
     def sum(self, arg):
         return func.sum(arg)
