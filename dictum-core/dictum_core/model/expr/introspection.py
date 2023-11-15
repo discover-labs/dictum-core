@@ -151,7 +151,7 @@ def _infer_kind(items: list):
     if items == {ExprKind.aggregate, ExprKind.scalar}:
         return ExprKind.aggregate
 
-    if items & {ExprKind.aggregate, ExprKind.column}:
+    if ExprKind.aggregate in items and ExprKind.column in items:
         raise MixedExpressionError(
             "mixed aggregate and non-aggregate parts in expression"
         )
@@ -246,7 +246,7 @@ class ExprKindTransformer(AbstractExprTransformer):
     OR = infer_kind
 
     def case(self, children: list):
-        return _infer_kind(children)
+        return _infer_kind([c for c in children if c is not None])
 
     def expr(self, children: list):
         return children[0]
