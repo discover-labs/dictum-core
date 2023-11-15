@@ -4,7 +4,11 @@ import pytest
 
 from dictum_core.backends.base import ExpressionTransformer
 from dictum_core.backends.secret import Secret
-from dictum_core.backends.sql_alchemy import SQLAlchemyBackend
+from dictum_core.backends.sql_alchemy import (
+    ColumnTransformer,
+    SQLAlchemyBackend,
+    SQLAlchemyCompiler,
+)
 from dictum_core.project.actions import _get_backend_parameters
 
 
@@ -58,3 +62,20 @@ def test_secret_parameters():
     parameters = _get_backend_parameters(backend)
     assert parameters["x"] == 1
     assert parameters["secret"] == "{{ env.DICTUM_SECRET_SECRET_SECRET }}"
+
+
+def test_sqlalchemy_case():
+    import sqlalchemy as sa
+
+    from dictum_core.model.expr import parse_expr
+
+    parsed = parse_expr("count(case when tbl.type = 1 then 1 end) / count()")
+    backend = SQLAlchemyBackend()
+    compiler = SQLAlchemyCompiler(backend)
+    ct = ColumnTransformer(
+        {
+            "tbl": sa.Table("tbl", sa.MetaData(), sa.Column("type", sa.Integer)),
+        }
+    )
+    columned = ct.transform(parsed)
+    compiler.transformer.transform(columned)
