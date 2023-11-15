@@ -75,3 +75,7 @@ def test_expr_total_function():
     assert get_expr_total_function(parse_expr("avg(col)")) is None
     assert get_expr_total_function(parse_expr("countd(col)")) is None
     assert get_expr_total_function(parse_expr("sum(col) + 1")) is None
+
+
+def test_mixed_bug():
+    get_expr_kind(parse_expr("count(case when type = 1 then 1 end) / count()"))
