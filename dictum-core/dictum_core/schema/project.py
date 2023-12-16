@@ -24,11 +24,10 @@ class Env:
             return val
 
 
-env = Env()
-
-
 def _load_yaml_template(path: Path):
-    return yaml.load(Template(path.read_text()).render(env=env), Loader=yaml.SafeLoader)
+    return yaml.load(
+        Template(path.read_text()).render(env=Env()), Loader=yaml.SafeLoader
+    )
 
 
 class Profile(BaseModel):
